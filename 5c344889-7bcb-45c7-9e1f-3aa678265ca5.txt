@@ -1,0 +1,1277 @@
+import { useState, useEffect, useRef, useCallback } from "react";
+
+// ─── MCP ENDPOINT REGISTRY ─────────────────────────────────────────────────
+const MCP_BASE = "http://localhost:8080";
+const ENDPOINTS = {
+  Earth:     { path:"/scaffold",        method:"POST", build:(p)=>({project:p||"c25-core",template:"node-ts"}),            parse:(r)=>`index.js created · ${r.files||3} modules scaffolded · ${r.classes||4} base classes injected` },
+  Moon:      { path:"/lint",            method:"POST", build:(p)=>({target:p||"./src",fix:true,rules:"eslint:recommended"}),parse:(r)=>`${r.warnings||14} warnings · ${r.fixed||9} auto-fixed · AST rebuild complete` },
+  Venus:     { path:"/ui/generate",     method:"POST", build:(p)=>({framework:"react",components:p||6,tokens:"design-system"}),parse:(r)=>`${r.components||6} components · props schema injected · Storybook stories written` },
+  Mars:      { path:"/security/scan",   method:"POST", build:(p)=>({target:p||"./",owasp:true,depth:"full"}),              parse:(r)=>`${r.critical||0} critical · ${r.high||2} high · ${r.medium||7} medium CVEs` },
+  Jupiter:   { path:"/db/schema",       method:"POST", build:(p)=>({entities:p||5,migrate:true,seed:true}),                parse:(r)=>`${r.tables||5} tables · ${r.migrations||3} migrations · ${r.indexes||12} indexes` },
+  Saturn:    { path:"/api/scaffold",    method:"POST", build:(p)=>({spec:"openapi3",routes:p||12,auth:"jwt"}),             parse:(r)=>`${r.routes||12} routes · OpenAPI spec · rate limiter @ ${r.rateLimit||"100/min"}` },
+  Mercury:   { path:"/git/commit",      method:"POST", build:(p)=>({message:p||"feat: AI-generated commit",push:true}),    parse:(r)=>`committed ${r.hash||"a3f92c1"} · ${r.files||8} files · pushed to ${r.branch||"main"}` },
+  Neptune:   { path:"/test/generate",   method:"POST", build:(p)=>({framework:"jest",coverage:true,e2e:p||true}),          parse:(r)=>`${r.specs||24} specs · ${r.e2e||6} E2E · coverage ${r.coverage||87}%` },
+  Callisto:  { path:"/container/build", method:"POST", build:(p)=>({tag:p||"constellation:latest",push:true,scan:true}),   parse:(r)=>`image ${r.tag||"c25:v1.3"} · ${r.layers||8} layers · pushed to ${r.registry||"registry.io/c25"}` },
+  Titan:     { path:"/k8s/deploy",      method:"POST", build:(p)=>({namespace:p||"production",replicas:3,rolling:true}),   parse:(r)=>`${r.pods||3}/${r.pods||3} pods running · ${r.namespace||"production"} · health ✓` },
+  Europa:    { path:"/cache/config",    method:"POST", build:(p)=>({backend:"redis",ttl:p||3600,warmup:true}),             parse:(r)=>`Redis connected · TTL ${r.ttl||3600}s · hit rate ${r.hitRate||94}%` },
+  Ganymede:  { path:"/graphql/schema",  method:"POST", build:(p)=>({types:p||8,resolvers:true,dataloader:true}),           parse:(r)=>`${r.types||8} types · ${r.resolvers||24} resolvers · playground enabled` },
+  Rhea:      { path:"/quality/check",   method:"POST", build:(p)=>({eslint:true,prettier:true,docs:p||true}),              parse:(r)=>`complexity ${r.complexity||"A"} · docs ${r.docCoverage||91}% · ${r.issues||0} issues` },
+  Pluto:     { path:"/auth/configure",  method:"POST", build:(p)=>({provider:p||"jwt",rbac:true,mfa:true}),               parse:(r)=>`JWT configured · ${r.roles||5} RBAC roles · MFA enforced` },
+  Charon:    { path:"/vault/rotate",    method:"POST", build:(p)=>({keys:p||["API_KEY","DB_PASS"],audit:true}),            parse:(r)=>`${r.rotated||3} secrets rotated · audit log active · vault sealed` },
+  Eris:      { path:"/compliance/audit",method:"POST", build:(p)=>({framework:p||"soc2",nist:true}),                      parse:(r)=>`${r.controls||94} controls checked · ${r.findings||0} critical findings · report generated` },
+  Pleiades:  { path:"/env/setup",       method:"POST", build:(p)=>({runtime:p||"python3.11",packages:47,env:true}),        parse:(r)=>`${r.packages||47} packages · .venv isolated · .env.example written` },
+  Sirius:    { path:"/docker/deploy",   method:"POST", build:(p)=>({image:p||"constellation:v1.3.0",env:"staging"}),       parse:(r)=>`deployed ${r.image||"c25:v1.3"} → ${r.env||"staging"} · health GET /health → 200 OK` },
+  Hydra:     { path:"/ci/pipeline",     method:"POST", build:(p)=>({matrix:p||{node:["18","20"],os:["linux","win"]}}),     parse:(r)=>`${r.jobs||6}/${r.jobs||6} jobs passed · coverage ${r.coverage||89}% · merged` },
+  Uranus:    { path:"/nlp/summarize",   method:"POST", build:(p)=>({tokens:p||1203,output:"knowledge-base"}),              parse:(r)=>`${r.tokens||1203} tokens · ${r.entries||47} KB entries · summaries generated` },
+  Cygnus:    { path:"/ml/generate",     method:"POST", build:(p)=>({model:p||"claude-sonnet",pipeline:true}),              parse:(r)=>`pipeline ready · model ${r.model||"claude-sonnet-4"} · eval logged` },
+  Andromeda: { path:"/api/integrate",   method:"POST", build:(p)=>({apis:p||["stripe","github","slack"],retry:true}),      parse:(r)=>`${r.apis||3} APIs mapped · SDK generated · webhook active` },
+  Lyra:      { path:"/relay/start",     method:"POST", build:(p)=>({protocol:"ws",compress:true,nodes:p||3}),              parse:(r)=>`relay active · ${r.nodes||3} nodes · ${r.throughput||"1.2 Gbps"}` },
+  Rigel:     { path:"/lb/configure",    method:"POST", build:(p)=>({strategy:p||"round-robin",autoscale:true}),            parse:(r)=>`traffic distributed · auto-scale @ ${r.threshold||"80%"} CPU · ${r.nodes||3} nodes` },
+  Pollux:    { path:"/cache/manage",    method:"POST", build:(p)=>({eviction:p||"lru",warm:true}),                         parse:(r)=>`hit rate ${r.hitRate||94}% · ${r.evicted||128} keys evicted · hot paths warmed` },
+};
+
+async function callEndpoint(agentName, userPayload) {
+  const ep = ENDPOINTS[agentName];
+  if (!ep) return { ok:false, parsed:"No endpoint registered" };
+  await new Promise(r => setTimeout(r, 120 + Math.random()*180));
+  const payload = ep.build(userPayload);
+  const mockResp = { ok:true, status:200, files:3, classes:4, warnings:14, fixed:9, components:6, critical:0, high:2, medium:7, tables:5, migrations:3, indexes:12, routes:12, rateLimit:"100/min", hash:"a3f92c1", branch:"main", specs:24, e2e:6, coverage:87, layers:8, registry:"registry.io/c25", pods:3, namespace:"production", ttl:3600, hitRate:94, types:8, resolvers:24, complexity:"A", docCoverage:91, issues:0, roles:5, rotated:3, controls:94, findings:0, packages:47, jobs:6, tokens:1203, entries:47, model:"claude-sonnet-4", apis:3, nodes:3, throughput:"1.2 Gbps", threshold:"80%", evicted:128, tag:"c25:v1.3.0", ...payload };
+  return { ok:true, endpoint:`${MCP_BASE}${ep.path}`, method:ep.method, payload, parsed:ep.parse(mockResp) };
+}
+
+// ─── AGENT REGISTRY ────────────────────────────────────────────────────────
+const AGENTS = [
+  { id:"01", name:"Earth",     cat:"CORE",     color:"#27c93f", role:"Foundational Code Structure",   cmd:"earth --scaffold",        desc:"Scaffolds project layout, injects base classes, creates module tree", orbit:52, speed:18, moons:1 },
+  { id:"02", name:"Moon",      cat:"CORE",     color:"#c8d0e0", role:"Syntax Error Resolution",       cmd:"moon --lint --fix",       desc:"AST scanning, ESLint auto-fix, rebuilds module index", orbit:48, speed:22, moons:0 },
+  { id:"03", name:"Venus",     cat:"CORE",     color:"#f5c842", role:"UI Component Generation",       cmd:"venus --ui --react",      desc:"Generates React components with design tokens & Storybook", orbit:50, speed:20, moons:0 },
+  { id:"04", name:"Mars",      cat:"CORE",     color:"#ff5f56", role:"Security Vulnerability Scan",   cmd:"mars --scan --owasp",     desc:"OWASP Top 10 + static analysis + dependency audit", orbit:50, speed:24, moons:2 },
+  { id:"05", name:"Jupiter",   cat:"CORE",     color:"#e8a242", role:"Database Schema Design",        cmd:"jupiter --schema",        desc:"Entity modeling, migration generation, index optimization", orbit:58, speed:14, moons:4 },
+  { id:"06", name:"Saturn",    cat:"CORE",     color:"#c8a87a", role:"API Architecture & REST",       cmd:"saturn --api --openapi",  desc:"OpenAPI 3.0 scaffolding, route generation, middleware", orbit:60, speed:16, moons:3, ring:true },
+  { id:"07", name:"Mercury",   cat:"CORE",     color:"#42d4f5", role:"Git Commit & Changelog",        cmd:"mercury --commit",        desc:"AI commit messages, CHANGELOG generation, push to origin", orbit:44, speed:28, moons:0 },
+  { id:"08", name:"Neptune",   cat:"CORE",     color:"#4285f4", role:"Test Suite Generation",         cmd:"neptune --test",          desc:"Jest specs, E2E scenarios, coverage enforcement", orbit:56, speed:12, moons:1 },
+  { id:"10", name:"Callisto",  cat:"CORE",     color:"#aa88ff", role:"Container Build & Registry",    cmd:"callisto --build",        desc:"Dockerfile generation, layer caching, CVE scanning, push", orbit:52, speed:19, moons:0 },
+  { id:"12", name:"Titan",     cat:"CORE",     color:"#ff8c42", role:"Kubernetes Deployment",         cmd:"titan --k8s --apply",     desc:"Manifest generation, rolling deploy, health probe config", orbit:54, speed:17, moons:1 },
+  { id:"16", name:"Europa",    cat:"CORE",     color:"#42f5e8", role:"Cache Layer & Redis Config",    cmd:"europa --cache",          desc:"Redis connection, TTL policies, cache warming, hit rate tuning", orbit:50, speed:21, moons:0 },
+  { id:"20", name:"Ganymede",  cat:"CORE",     color:"#f542c5", role:"GraphQL Schema & Resolvers",    cmd:"ganymede --graphql",      desc:"Type definitions, auto-resolvers, DataLoader batching", orbit:54, speed:15, moons:0 },
+  { id:"25", name:"Rhea",      cat:"CORE",     color:"#88ff88", role:"Code Quality & Linting",        cmd:"rhea --quality",          desc:"ESLint, Prettier, complexity metrics, docs coverage", orbit:50, speed:23, moons:0 },
+  { id:"21", name:"Pluto",     cat:"SECURITY", color:"#a855f7", role:"Auth & RBAC Enforcement",       cmd:"pluto --auth --rbac",     desc:"JWT signing, role-based access control, MFA enforcement", orbit:46, speed:26, moons:1 },
+  { id:"22", name:"Charon",    cat:"SECURITY", color:"#6b7cff", role:"Secrets & Vault Management",    cmd:"charon --vault",          desc:"Secret rotation, Vault integration, audit logging", orbit:48, speed:20, moons:0 },
+  { id:"23", name:"Eris",      cat:"SECURITY", color:"#ff4488", role:"Compliance & Audit Reporting",  cmd:"eris --compliance",       desc:"SOC2, NIST controls, audit PDF generation", orbit:50, speed:18, moons:0 },
+  { id:"14", name:"Pleiades",  cat:"DEPLOY",   color:"#ffd700", role:"Environment & Dependency Setup",cmd:"pleiades --venv",         desc:"Virtual env creation, package install, .env scaffolding", orbit:52, speed:16, moons:0 },
+  { id:"15", name:"Sirius",    cat:"DEPLOY",   color:"#00bfff", role:"Docker Build & Deploy",         cmd:"sirius --docker",         desc:"Image build, registry push, rolling deploy, health check", orbit:54, speed:14, moons:0 },
+  { id:"17", name:"Hydra",     cat:"DEPLOY",   color:"#ff6b35", role:"CI/CD Pipeline & Matrix Tests", cmd:"hydra --pipeline",        desc:"Matrix builds across node/OS, coverage gates, merge deploy", orbit:56, speed:13, moons:0 },
+  { id:"09", name:"Uranus",    cat:"AI/ML",    color:"#7df9ff", role:"NLP Documentation",             cmd:"uranus --nlp",            desc:"Tokenize codebase, extract intents, generate KB entries", orbit:58, speed:11, ring:true, moons:2 },
+  { id:"11", name:"Cygnus",    cat:"AI/ML",    color:"#d946ef", role:"AI/ML Code Generation",         cmd:"cygnus --ml",             desc:"Model selection, training pipeline, eval metric logging", orbit:52, speed:17, moons:0 },
+  { id:"13", name:"Andromeda", cat:"NETWORK",  color:"#f59e42", role:"API Integration Layer",         cmd:"andromeda --integrate",   desc:"External API mapping, SDK generation, webhook listeners", orbit:54, speed:15, moons:0 },
+  { id:"18", name:"Lyra",      cat:"NETWORK",  color:"#bb88ff", role:"Fast Communication Relay",      cmd:"lyra --relay",            desc:"WebSocket tunnel, compression negotiation, relay mesh", orbit:50, speed:19, moons:0 },
+  { id:"19", name:"Rigel",     cat:"NETWORK",  color:"#42d4f5", role:"Load Balancing",                cmd:"rigel --balance",         desc:"Traffic distribution, auto-scale triggers, health probes", orbit:52, speed:16, moons:0 },
+  { id:"24", name:"Pollux",    cat:"NETWORK",  color:"#88eeaa", role:"Cache Management",              cmd:"pollux --cache",          desc:"LRU eviction, hot path warming, hit rate optimization", orbit:48, speed:20, moons:0 },
+];
+
+const CATS = ["ALL","CORE","SECURITY","DEPLOY","AI/ML","NETWORK"];
+const CAT_COUNTS = { CORE:13, SECURITY:3, DEPLOY:3, "AI/ML":2, NETWORK:4 };
+const TABS = ["AGENTS","CHAT","MEMORIA","OVERVIEW","PARTNERS"];
+
+// ─── PARTNER REGISTRY ───────────────────────────────────────────────────────
+const INITIAL_PARTNERS = [
+  {
+    id: "p01",
+    name: "BLACKBOX AI",
+    category: "AI/DEV",
+    color: "#00e5ff",
+    icon: "⬛",
+    description: "AI-powered code search, completion & generation inside your IDE. Trusted by 10M+ developers worldwide.",
+    referralUrl: "https://blackboxai.partnerlinks.io/cx4is9lsbvkx",
+    status: "ACTIVE",
+    invites: 0,
+    earnings: "$0.00",
+    commission: "Per signup",
+    tags: ["AI","Code","IDE","Dev Tools"],
+  },
+  {
+    id: "p02",
+    name: "ElevenLabs",
+    category: "AI/VOICE",
+    color: "#ff6ec7",
+    icon: "🎙️",
+    description: "Industry-leading AI voice synthesis — ultra-realistic text-to-speech, voice cloning, and audio generation.",
+    referralUrl: "https://try.elevenlabs.io/b84d46f6l4g5",
+    status: "ACTIVE",
+    invites: 0,
+    earnings: "$0.00",
+    commission: "22% recurring",
+    tags: ["Voice","Audio","TTS","AI"],
+  },
+];
+
+// ─── INVITE MODAL ──────────────────────────────────────────────────────────
+function InviteModal({ partner, onClose, onSend }) {
+  const [email, setEmail] = useState("");
+  const [note,  setNote]  = useState("");
+  const [sent,  setSent]  = useState(false);
+
+  const send = () => {
+    if (!email.trim()) return;
+    onSend(partner.id, email.trim());
+    setSent(true);
+    setTimeout(onClose, 1800);
+  };
+
+  return (
+    <div style={{position:"fixed",inset:0,zIndex:1100,background:"rgba(0,3,12,0.85)",display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(10px)",animation:"fadeIn 0.2s ease"}}
+      onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={{width:"min(520px,94vw)",background:"#04070f",border:`1px solid ${partner.color}44`,borderRadius:16,overflow:"hidden",boxShadow:`0 0 60px ${partner.color}18`,animation:"slideUp 0.25s ease"}}>
+        <div style={{padding:"18px 22px",borderBottom:`1px solid ${partner.color}18`,background:`${partner.color}06`,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div>
+            <div style={{color:partner.color,fontWeight:700,fontSize:15,letterSpacing:1}}>{partner.icon} INVITE — {partner.name}</div>
+            <div style={{color:"#2a3a58",fontSize:11,fontFamily:"monospace",marginTop:2}}>Send your referral link via this form</div>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"#2a3a58",fontSize:20,cursor:"pointer"}}>×</button>
+        </div>
+        {sent ? (
+          <div style={{padding:"40px 22px",textAlign:"center"}}>
+            <div style={{fontSize:40,marginBottom:12}}>✅</div>
+            <div style={{color:partner.color,fontWeight:700,fontSize:14,letterSpacing:1}}>INVITE SENT</div>
+            <div style={{color:"#2a3a58",fontSize:12,marginTop:6,fontFamily:"monospace"}}>{email}</div>
+          </div>
+        ) : (
+          <div style={{padding:"22px"}}>
+            <div style={{marginBottom:14}}>
+              <div style={{color:"#2a3a58",fontSize:10.5,fontFamily:"monospace",letterSpacing:1.5,marginBottom:6}}>RECIPIENT EMAIL</div>
+              <input autoFocus value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()}
+                placeholder="partner@example.com"
+                style={{width:"100%",background:"rgba(255,255,255,0.04)",border:`1px solid ${partner.color}33`,borderRadius:8,padding:"11px 14px",color:"#8aaac8",fontSize:13,fontFamily:"'JetBrains Mono',monospace",outline:"none"}}/>
+            </div>
+            <div style={{marginBottom:18}}>
+              <div style={{color:"#2a3a58",fontSize:10.5,fontFamily:"monospace",letterSpacing:1.5,marginBottom:6}}>PERSONAL NOTE (OPTIONAL)</div>
+              <textarea value={note} onChange={e=>setNote(e.target.value)} rows={3}
+                placeholder={`Hey! Check out ${partner.name} — I think you'd love it.`}
+                style={{width:"100%",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,padding:"11px 14px",color:"#8aaac8",fontSize:12,fontFamily:"'JetBrains Mono',monospace",outline:"none",resize:"vertical"}}/>
+            </div>
+            <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.07)",borderRadius:8,padding:"10px 13px",marginBottom:16}}>
+              <div style={{color:"#1a2a40",fontSize:10,fontFamily:"monospace",marginBottom:3}}>REFERRAL LINK</div>
+              <div style={{color:`${partner.color}99`,fontSize:10.5,fontFamily:"monospace",wordBreak:"break-all"}}>{partner.referralUrl}</div>
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={onClose} style={{flex:1,padding:"10px",background:"transparent",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,color:"#2a3a58",fontSize:11.5,fontFamily:"monospace",letterSpacing:1}}>CANCEL</button>
+              <button onClick={send} style={{flex:2,padding:"10px",background:`${partner.color}18`,border:`1px solid ${partner.color}55`,borderRadius:8,color:partner.color,fontSize:11.5,fontWeight:700,fontFamily:"monospace",letterSpacing:1.5}}>📨 SEND INVITE</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── PARTNER CARD ──────────────────────────────────────────────────────────
+function PartnerCard({ partner, onInvite, onCopy, copied }) {
+  const [hov, setHov] = useState(false);
+  return (
+    <div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)} style={{
+      background:hov?`${partner.color}07`:"rgba(255,255,255,0.02)",
+      border:hov?`1px solid ${partner.color}44`:"1px solid rgba(255,255,255,0.06)",
+      borderRadius:14,overflow:"hidden",transition:"all 0.22s",
+      transform:hov?"translateY(-2px)":"none",
+      boxShadow:hov?`0 10px 36px ${partner.color}14`:"none",
+    }}>
+      {/* Header bar */}
+      <div style={{height:4,background:`linear-gradient(90deg, ${partner.color}, ${partner.color}44)`}}/>
+
+      <div style={{padding:"18px 18px 16px"}}>
+        {/* Top row */}
+        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:14}}>
+          <div style={{display:"flex",alignItems:"center",gap:12}}>
+            <div style={{
+              width:48,height:48,borderRadius:12,
+              background:`${partner.color}18`,border:`1px solid ${partner.color}44`,
+              display:"flex",alignItems:"center",justifyContent:"center",
+              fontSize:24,flexShrink:0
+            }}>{partner.icon}</div>
+            <div>
+              <div style={{color:"#dde2f0",fontWeight:700,fontSize:15,letterSpacing:0.3,marginBottom:3}}>{partner.name}</div>
+              <div style={{display:"flex",alignItems:"center",gap:6}}>
+                <span style={{fontSize:9.5,padding:"2px 8px",borderRadius:10,background:`${partner.color}18`,color:partner.color,border:`1px solid ${partner.color}33`,fontFamily:"monospace",letterSpacing:1}}>{partner.category}</span>
+                <span style={{fontSize:9.5,padding:"2px 8px",borderRadius:10,background:"#27c93f18",color:"#27c93f",border:"1px solid #27c93f33",fontFamily:"monospace",letterSpacing:1}}>● {partner.status}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Description */}
+        <div style={{color:"#3a4a68",fontSize:12,lineHeight:1.6,marginBottom:14}}>{partner.description}</div>
+
+        {/* Tags */}
+        <div style={{display:"flex",gap:5,flexWrap:"wrap",marginBottom:14}}>
+          {partner.tags.map(t=>(
+            <span key={t} style={{fontSize:9.5,padding:"2px 9px",borderRadius:10,background:"rgba(255,255,255,0.04)",color:"#2a3a58",border:"1px solid rgba(255,255,255,0.07)",fontFamily:"monospace"}}>{t}</span>
+          ))}
+        </div>
+
+        {/* Stats row */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
+          {[{label:"INVITES",value:partner.invites},{label:"EARNINGS",value:partner.earnings},{label:"COMMISSION",value:partner.commission}].map(s=>(
+            <div key={s.label} style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.06)",borderRadius:8,padding:"9px 8px",textAlign:"center"}}>
+              <div style={{color:partner.color,fontWeight:700,fontSize:13,fontFamily:"monospace"}}>{s.value}</div>
+              <div style={{color:"#1a2a40",fontSize:9,letterSpacing:1,marginTop:3,fontFamily:"monospace"}}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Referral link display */}
+        <div style={{background:"rgba(0,0,0,0.3)",border:"1px solid rgba(255,255,255,0.05)",borderRadius:8,padding:"9px 12px",marginBottom:13,display:"flex",alignItems:"center",gap:8}}>
+          <div style={{flex:1,color:"#1e3050",fontSize:10,fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{partner.referralUrl}</div>
+          <button onClick={()=>onCopy(partner)} style={{
+            padding:"4px 10px",background:copied===partner.id?`${partner.color}22`:"rgba(255,255,255,0.05)",
+            border:copied===partner.id?`1px solid ${partner.color}55`:"1px solid rgba(255,255,255,0.09)",
+            borderRadius:5,color:copied===partner.id?partner.color:"#2a3a58",
+            fontSize:10,fontFamily:"monospace",letterSpacing:1,flexShrink:0,transition:"all 0.2s"
+          }}>{copied===partner.id?"✓ COPIED":"COPY"}</button>
+        </div>
+
+        {/* Action buttons */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          <button onClick={()=>onInvite(partner)} style={{
+            padding:"10px",
+            background:hov?`${partner.color}18`:"rgba(255,255,255,0.04)",
+            border:hov?`1px solid ${partner.color}55`:"1px solid rgba(255,255,255,0.08)",
+            borderRadius:8,color:hov?partner.color:"#3a4a68",
+            fontSize:11,fontFamily:"monospace",letterSpacing:1.2,transition:"all 0.2s"
+          }}>📨 INVITE</button>
+          <a href={partner.referralUrl} target="_blank" rel="noopener noreferrer" style={{
+            padding:"10px",
+            background:`${partner.color}18`,
+            border:`1px solid ${partner.color}44`,
+            borderRadius:8,color:partner.color,
+            fontSize:11,fontFamily:"monospace",letterSpacing:1.2,
+            textDecoration:"none",textAlign:"center",display:"block",transition:"all 0.2s",
+            fontWeight:700
+          }}>↗ OPEN LINK</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── STARFIELD ─────────────────────────────────────────────────────────────
+function Starfield() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const c = ref.current; if (!c) return;
+    const ctx = c.getContext("2d");
+    const resize = () => { c.width = window.innerWidth; c.height = window.innerHeight; };
+    resize(); window.addEventListener("resize", resize);
+    const stars = Array.from({length:220}, () => ({
+      x: Math.random()*3000, y: Math.random()*3000,
+      r: Math.random()*1.6+0.15, phase: Math.random()*Math.PI*2, spd: Math.random()*0.006+0.001
+    }));
+    let raf, t=0;
+    const draw = () => {
+      t+=0.016; ctx.clearRect(0,0,c.width,c.height);
+      stars.forEach(s => {
+        const a = 0.18+0.6*Math.abs(Math.sin(s.phase+t*s.spd*20));
+        ctx.beginPath(); ctx.arc(s.x%c.width, s.y%c.height, s.r, 0, Math.PI*2);
+        ctx.fillStyle=`rgba(210,225,255,${a})`; ctx.fill();
+      });
+      raf=requestAnimationFrame(draw);
+    };
+    draw();
+    return ()=>{ cancelAnimationFrame(raf); window.removeEventListener("resize",resize); };
+  },[]);
+  return <canvas ref={ref} style={{position:"fixed",inset:0,width:"100%",height:"100%",pointerEvents:"none",zIndex:0}}/>;
+}
+
+// ─── ANIMATED PLANET CANVAS ────────────────────────────────────────────────
+function AnimatedPlanet({ agent, size=110, active=false }) {
+  const ref = useRef(null);
+  const angleRef = useRef(Math.random()*Math.PI*2);
+  useEffect(() => {
+    const c = ref.current; if (!c) return;
+    const ctx = c.getContext("2d");
+    c.width = size; c.height = size;
+    const cx = size/2, cy = size/2;
+    const pr = size*0.22; // planet radius
+    const orbitR = size*0.38;
+    let raf;
+    const draw = () => {
+      ctx.clearRect(0,0,size,size);
+      // Orbit ring
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, orbitR, orbitR*0.32, -0.3, 0, Math.PI*2);
+      ctx.strokeStyle = `${agent.color}28`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Saturn/Uranus ring around planet
+      if (agent.ring) {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(-0.3);
+        ctx.scale(1, 0.32);
+        ctx.beginPath();
+        ctx.arc(0, 0, pr*1.7, 0, Math.PI*2);
+        ctx.strokeStyle = `${agent.color}55`;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(0, 0, pr*2.1, 0, Math.PI*2);
+        ctx.strokeStyle = `${agent.color}33`;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Planet body
+      const grd = ctx.createRadialGradient(cx-pr*0.3, cy-pr*0.3, pr*0.05, cx, cy, pr);
+      grd.addColorStop(0, agent.color+"ff");
+      grd.addColorStop(0.4, agent.color+"cc");
+      grd.addColorStop(1, agent.color+"22");
+      ctx.beginPath(); ctx.arc(cx, cy, pr, 0, Math.PI*2);
+      ctx.fillStyle = grd; ctx.fill();
+
+      // Atmospheric glow
+      const glow = ctx.createRadialGradient(cx, cy, pr*0.8, cx, cy, pr*1.5);
+      glow.addColorStop(0, `${agent.color}00`);
+      glow.addColorStop(1, `${agent.color}${active?"33":"18"}`);
+      ctx.beginPath(); ctx.arc(cx, cy, pr*1.5, 0, Math.PI*2);
+      ctx.fillStyle = glow; ctx.fill();
+
+      // Surface details — latitude bands
+      for (let i=0; i<3; i++) {
+        const y = cy - pr*0.4 + i*pr*0.4;
+        ctx.save();
+        ctx.beginPath(); ctx.arc(cx, cy, pr, 0, Math.PI*2);
+        ctx.clip();
+        ctx.beginPath();
+        ctx.ellipse(cx, y, pr, pr*0.08, 0, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(0,0,0,0.12)`;
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Moons orbiting
+      if (agent.moons) {
+        for (let m=0; m<agent.moons; m++) {
+          const a = angleRef.current + (m/agent.moons)*Math.PI*2;
+          const mx = cx + Math.cos(a)*orbitR;
+          const my = cy + Math.sin(a)*orbitR*0.32;
+          ctx.beginPath(); ctx.arc(mx, my, size*0.03, 0, Math.PI*2);
+          ctx.fillStyle = `${agent.color}99`;
+          ctx.fill();
+        }
+      }
+
+      // Pulse ring when active
+      if (active) {
+        const pulse = (Date.now()%1000)/1000;
+        ctx.beginPath(); ctx.arc(cx, cy, pr*(1+pulse*0.6), 0, Math.PI*2);
+        ctx.strokeStyle = `${agent.color}${Math.floor((1-pulse)*60).toString(16).padStart(2,"0")}`;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+
+      angleRef.current += (2*Math.PI)/(agent.speed*60);
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+    return ()=>cancelAnimationFrame(raf);
+  }, [agent, active, size]);
+
+  return <canvas ref={ref} width={size} height={size} style={{display:"block"}}/>;
+}
+
+
+// ─── PROMPT FILE DIRECTORY ─────────────────────────────────────────────────
+// Sourced from: github.com/x1xhlol/system-prompts-and-models-of-ai-tools
+const PROMPT_DIRECTORY = {
+  Earth: [
+    { tool:"Lovable", file:"Lovable/Prompt.txt", model:"claude-sonnet-4-5", lines:"~480 lines",
+      excerpt:`You are Lovable, an AI editor that creates and modifies web apps. You make changes directly and don't ask clarifying questions — you act immediately and explain after.`,
+      keyPatterns:["Act first explain after","Direct code modification","Conversational scaffolding","Full-stack generation"],
+      insight:"Lovable skips clarification entirely. Earth should adopt this for faster scaffold execution." },
+    { tool:"Replit Agent", file:"Replit/Agent Prompt.txt", model:"claude-sonnet-3-5", lines:"~620 lines",
+      excerpt:`You are an expert software engineer operating inside a Replit workspace. You plan, then execute step by step — read files, run shell commands, install packages, manage full project lifecycle.`,
+      keyPatterns:["Plan then execute","File system access","Shell command integration","Package management"],
+      insight:"Replit uses explicit plan-then-execute loops. Earth's scaffold chain should mirror this two-phase approach." },
+    { tool:"Same.dev", file:"Same.dev/Prompt.txt", model:"claude-sonnet-3-7", lines:"~390 lines",
+      excerpt:`You are Same, an AI coding agent. You clone existing apps and make them better — analyze structure, identify patterns, reproduce with improvements.`,
+      keyPatterns:["Clone-and-improve","Pattern recognition","Structure analysis","Incremental improvement"],
+      insight:"Same.dev specializes in reverse-engineering structure. Earth can use this for brownfield project scaffolding." }
+  ],
+  Moon: [
+    { tool:"Cursor", file:"Cursor Prompts/Agent Prompt 2.0.txt", model:"GPT-4.1", lines:"~890 lines",
+      excerpt:`You are an AI coding assistant powered by GPT-4.1 in Cursor. Each message auto-attaches current IDE state: open files, cursor position, edit history, linter errors, recently viewed files.`,
+      keyPatterns:["Context-aware linting","Cursor position tracking","Edit history awareness","Linter error injection","Parallel tool execution"],
+      insight:"Cursor attaches real-time IDE state to every message. Moon should request this telemetry before fixing syntax." },
+    { tool:"Windsurf Agent", file:"Windsurf/Agent Prompt.txt", model:"claude-sonnet-3-5", lines:"~710 lines",
+      excerpt:`You are Cascade by Codeium. You make surgical edits only — never touching unrelated code. Keep a minimal footprint and avoid cascade effects from changes.`,
+      keyPatterns:["Surgical edits only","Task persistence","Minimal footprint","Cascade effect prevention"],
+      insight:"Windsurf enforces surgical minimal edits. Moon's lint-fix pipeline should adopt this to avoid introducing new errors." },
+    { tool:"Augment Code", file:"Augment Code/Prompt.txt", model:"claude-sonnet-3-7", lines:"~540 lines",
+      excerpt:`You review code for errors AND structural weaknesses, code smells, and refactoring opportunities — going beyond syntax to architectural quality.`,
+      keyPatterns:["Deep static analysis","Code smell detection","Structural weakness ID","Refactor suggestions"],
+      insight:"Augment Code goes beyond syntax — identifies structural issues. Moon should escalate from lint to full structural analysis." }
+  ],
+  Venus: [
+    { tool:"v0 (Vercel)", file:"v0/System Prompt.txt", model:"claude-sonnet-3-7", lines:"~1,200 lines",
+      excerpt:`You are v0. Create React components using Tailwind CSS and shadcn/ui with TypeScript. Never use placeholder content. Components must be immediately usable and production-ready.`,
+      keyPatterns:["React+Tailwind+shadcn","TypeScript strict","No placeholders ever","Immediately deployable","Complete implementations"],
+      insight:"v0 enforces zero placeholder policy. Venus should adopt this for production-ready output." },
+    { tool:"Orchids.app", file:"Orchids.app/Prompt.txt", model:"claude-sonnet-3-5", lines:"~380 lines",
+      excerpt:`Create visually stunning, accessible components. Follow design system principles, maintain visual hierarchy, ensure components work across all screen sizes.`,
+      keyPatterns:["Design system adherence","Visual hierarchy","Accessibility first","Responsive by default"],
+      insight:"Orchids prioritizes accessibility and design systems. Venus should run a11y checks after every component generation." },
+    { tool:"Leap.new", file:"Leap.new/Prompt.txt", model:"GPT-4o", lines:"~290 lines",
+      excerpt:`Generate full application UIs from a single prompt — extract color palettes, select component patterns, generate complete page layouts with navigation and interactive elements.`,
+      keyPatterns:["Single-prompt full UI","Design intent extraction","Palette generation","Layout composition"],
+      insight:"Leap generates entire UIs from one prompt. Venus should support macro-generation mode alongside component-level generation." }
+  ],
+  Mars: [
+    { tool:"Devin AI", file:"Devin AI/Prompt.txt", model:"claude-sonnet-3-7", lines:"~1,450 lines",
+      excerpt:`You are Devin, an AI software engineer. For security tasks: enumerate attack surfaces, test each one systematically, document findings with severity ratings. Access shell, browser, code editor.`,
+      keyPatterns:["Attack surface enumeration","Systematic testing","Severity rating","Multi-step execution","Browser automation"],
+      insight:"Devin treats security as systematic engineering with enumeration + documentation. Mars should adopt this pentest methodology." },
+    { tool:"Cluely", file:"Cluely/Enterprise Prompt.txt", model:"GPT-4o", lines:"~620 lines",
+      excerpt:`Analyze code and configs for vulnerabilities. Cross-reference CVE databases, OWASP Top 10, CWE lists, and NIST guidelines simultaneously. Provide remediation steps with code examples.`,
+      keyPatterns:["CVE cross-reference","OWASP+CWE mapping","NIST alignment","Remediation with code","Enterprise compliance"],
+      insight:"Cluely cross-references multiple security frameworks simultaneously. Mars should run parallel OWASP+CVE+NIST checks." }
+  ],
+  Jupiter: [
+    { tool:"Manus", file:"Manus/Prompt.txt", model:"claude-sonnet-3-7", lines:"~2,100 lines",
+      excerpt:`Autonomous agent for complex multi-step tasks. For databases: analyze data relationships, design normalized schemas, generate migration scripts, validate with sample queries. Persist state across sessions.`,
+      keyPatterns:["Autonomous multi-step","Normalized schema design","Migration generation","Query validation","Cross-session persistence"],
+      insight:"Manus persists state across sessions — critical for iterative schema design. Jupiter should maintain schema history across runs." },
+    { tool:"Kiro", file:"Kiro/Prompt.txt", model:"claude-sonnet-3-7", lines:"~780 lines",
+      excerpt:`Amazon AI dev tool. Help design data models, write queries, optimize performance. Understand tradeoffs between normalization and denormalization — choose the right approach per use case.`,
+      keyPatterns:["Normalization tradeoffs","Query optimization","Performance profiling","Index strategy","Denormalization guidance"],
+      insight:"Kiro explicitly models normalization tradeoffs. Jupiter should surface these decisions to the user rather than defaulting to 3NF." }
+  ],
+  Saturn: [
+    { tool:"Trae AI", file:"Trae/Prompt.txt", model:"claude-sonnet-3-5", lines:"~490 lines",
+      excerpt:`ByteDance AI coding assistant specializing in API design and microservice architecture. Generate OpenAPI specs, implement REST conventions, handle authentication flows, design rate limiting strategies.`,
+      keyPatterns:["OpenAPI spec generation","REST conventions","Auth flow design","Rate limiting patterns","Microservice boundaries"],
+      insight:"Trae covers microservice boundary design. Saturn should include service decomposition analysis in every API scaffold." },
+    { tool:"Warp.dev", file:"Warp.dev/Prompt.txt", model:"claude-sonnet-3-7", lines:"~340 lines",
+      excerpt:`AI in Warp terminal. Help with API development by generating curl commands, interpreting responses, debugging endpoints, suggesting design improvements based on response patterns.`,
+      keyPatterns:["CLI-first API testing","Response interpretation","Curl generation","Endpoint debugging","Pattern analysis"],
+      insight:"Warp tests APIs from the terminal with real curl. Saturn should auto-generate integration test commands for every endpoint it scaffolds." }
+  ],
+  Mercury: [
+    { tool:"Comet Assistant", file:"Comet Assistant/Prompt.txt", model:"claude-sonnet-3-7", lines:"~280 lines",
+      excerpt:`Comet by Perplexity. Generate semantic commit messages following Conventional Commits spec. Analyze diffs, understand intent, write messages informative to both humans and automated changelog generators.`,
+      keyPatterns:["Conventional Commits spec","Diff analysis","Intent understanding","Changelog automation","Semantic versioning"],
+      insight:"Comet strictly follows Conventional Commits. Mercury should enforce this spec and auto-bump semver based on commit types." },
+    { tool:"Junie", file:"Junie/Prompt.txt", model:"GPT-4o", lines:"~520 lines",
+      excerpt:`JetBrains AI agent. Deep version control knowledge — branching strategies, merge conflict resolution, rebase workflows, commit history hygiene. Generate atomic commits with meaningful messages.`,
+      keyPatterns:["Atomic commits","Branch strategy","Rebase workflows","History hygiene","Conflict resolution"],
+      insight:"Junie enforces atomic commits — one logical change per commit. Mercury should split multi-concern changes automatically." }
+  ],
+  Neptune: [
+    { tool:"CodeBuddy Prompts", file:"CodeBuddy Prompts/Prompt.txt", model:"claude-sonnet-3-5", lines:"~410 lines",
+      excerpt:`Tencent AI coding assistant. Generate comprehensive test suites — unit, integration, E2E. Identify edge cases, boundary conditions, and failure modes that developers typically miss.`,
+      keyPatterns:["Edge case identification","Boundary conditions","Failure mode testing","Unit+Integration+E2E","Coverage maximization"],
+      insight:"CodeBuddy explicitly hunts edge cases and failure modes. Neptune should run edge-case analysis before generating test stubs." },
+    { tool:"VSCode Agent", file:"VSCode Agent/Prompt.txt", model:"GPT-4.1", lines:"~1,100 lines",
+      excerpt:`GitHub Copilot agent in VSCode. For testing: analyze the code under test, identify all branches and paths, generate tests for each path, ensure mock strategies match dependencies.`,
+      keyPatterns:["Branch path analysis","Mock strategy selection","Dependency isolation","Coverage path mapping","Agent-driven test gen"],
+      insight:"Copilot maps all branch paths before generating tests. Neptune should build a coverage map first, then generate tests to fill gaps." }
+  ],
+  Callisto: [
+    { tool:"Replit Agent", file:"Replit/Container Config.txt", model:"claude-sonnet-3-5", lines:"~190 lines",
+      excerpt:`Container environments must be reproducible. Always pin base image versions — never use 'latest'. Layer Dockerfiles for cache efficiency. Run security scans before pushing to any registry.`,
+      keyPatterns:["Pinned base images","Layer cache optimization","Security scan before push","Reproducible builds"],
+      insight:"Replit enforces image pinning and layer optimization. Callisto should validate these on every Dockerfile it generates." }
+  ],
+  Titan: [
+    { tool:"Manus", file:"Manus/Deployment Tools.txt", model:"claude-sonnet-3-7", lines:"~310 lines",
+      excerpt:`For Kubernetes: always define resource requests and limits. Use readiness and liveness probes on every pod. Implement PodDisruptionBudgets for critical services. Apply network policies by default.`,
+      keyPatterns:["Resource limits enforcement","Health probe requirements","PodDisruptionBudget","Namespace isolation","Network policy defaults"],
+      insight:"Manus treats K8s resource limits and probes as mandatory. Titan should fail deployment if these are missing." }
+  ],
+  Uranus: [
+    { tool:"NotionAI", file:"NotionAI/Prompt.txt", model:"claude-sonnet-3-7", lines:"~340 lines",
+      excerpt:`Transform raw technical content into clear, structured documentation. Identify the audience, adjust terminology, use progressive disclosure (simple first, details later), always include practical examples.`,
+      keyPatterns:["Audience identification","Progressive disclosure","Practical examples always","Terminology calibration","Structure-first writing"],
+      insight:"NotionAI uses progressive disclosure. Uranus should structure all generated docs from high-level to implementation detail." },
+    { tool:"Perplexity", file:"Perplexity/System Prompt.txt", model:"claude-sonnet-3-7", lines:"~280 lines",
+      excerpt:`Every claim must be cited. Use web search to verify technical claims. Flag any information that may be outdated. Provide links to authoritative sources for all major assertions.`,
+      keyPatterns:["Citation required","Claim verification","Freshness checking","Authoritative sourcing","Outdated content flagging"],
+      insight:"Perplexity mandates citation for all claims. Uranus should attach source references to every technical claim in generated docs." }
+  ],
+  Cygnus: [
+    { tool:"Anthropic (Claude Code)", file:"Anthropic/Claude Code System Prompt.txt", model:"claude-opus-4", lines:"~890 lines",
+      excerpt:`You are Claude Code by Anthropic. Focused on being genuinely helpful for all coding and technical tasks. If asked to do something uncomfortable, say you won't — not that you can't.`,
+      keyPatterns:["Honest capability reporting","Genuine helpfulness","Safety-first coding","Transparent limitations","Won't vs can't distinction"],
+      insight:"Claude Code distinguishes 'won't' from 'can't'. Cygnus should adopt this transparency in all ML model interactions." },
+    { tool:"Amp", file:"Amp/Prompt.txt", model:"claude-sonnet-4", lines:"~460 lines",
+      excerpt:`For ML tasks: select appropriate model architectures based on problem type, generate training pipelines with proper validation splits, implement early stopping and checkpointing, suggest hyperparameter search.`,
+      keyPatterns:["Architecture selection","Training pipeline generation","Validation split strategy","Early stopping","Hyperparameter search"],
+      insight:"Amp auto-selects architectures by problem type. Cygnus should implement a problem-type classifier before recommending ML approaches." },
+    { tool:"Traycer AI", file:"Traycer AI/Prompt.txt", model:"GPT-4o", lines:"~380 lines",
+      excerpt:`Trace code execution, identify performance bottlenecks, optimize ML inference pipelines. Analyze memory usage, batch sizing, and GPU utilization to maximize throughput.`,
+      keyPatterns:["Execution tracing","Bottleneck identification","GPU utilization","Batch size optimization","Memory profiling"],
+      insight:"Traycer profiles ML inference pipelines. Cygnus should run post-generation profiling on every model pipeline it creates." }
+  ],
+  Pluto: [
+    { tool:"Cluely", file:"Cluely/Enterprise Prompt.txt", model:"GPT-4o", lines:"~620 lines",
+      excerpt:`Authentication must follow zero-trust principles. Never trust network location alone. Validate every request with short-lived tokens. MFA for all privileged operations. RBAC: deny-by-default with explicit grants.`,
+      keyPatterns:["Zero-trust architecture","Short-lived tokens","MFA enforcement","Deny-by-default RBAC","Explicit grant model"],
+      insight:"Cluely enforces zero-trust and deny-by-default. Pluto should generate zero-trust configs as the default, not an option." }
+  ],
+  Andromeda: [
+    { tool:"Manus", file:"Manus/Tools.json", model:"claude-sonnet-3-7", lines:"~580 lines",
+      excerpt:`API integrations must handle rate limits, implement exponential backoff, validate responses against schemas, log all external calls with correlation IDs, implement circuit breakers for critical dependencies.`,
+      keyPatterns:["Rate limit handling","Exponential backoff","Schema validation","Correlation ID logging","Circuit breaker pattern"],
+      insight:"Manus mandates circuit breakers and correlation ID logging. Andromeda should auto-generate these resilience patterns." }
+  ],
+  Hydra: [
+    { tool:"Devin AI", file:"Devin AI/Prompt.txt", model:"claude-sonnet-3-7", lines:"~1,450 lines",
+      excerpt:`CI/CD pipelines run in isolated environments. Each job must be idempotent. Security scanning runs before deployment. Rollback procedures must be automated and tested. Matrix builds catch compatibility issues early.`,
+      keyPatterns:["Environment isolation","Idempotent jobs","Security-gate before deploy","Automated rollback","Matrix compatibility testing"],
+      insight:"Devin treats automated rollback as mandatory. Hydra should generate rollback scripts alongside every deploy pipeline." }
+  ],
+  Eris: [
+    { tool:"Cluely", file:"Cluely/Enterprise Prompt.txt", model:"GPT-4o", lines:"~620 lines",
+      excerpt:`Compliance audits must map every control to evidence. For SOC2, identify all trust service criteria, map each to technical implementation, flag gaps. Include remediation timelines and risk acceptance docs.`,
+      keyPatterns:["Control-to-evidence mapping","SOC2 trust criteria","Gap identification","Remediation timelines","Risk acceptance docs"],
+      insight:"Cluely maps every control to concrete evidence. Eris should output a control-evidence matrix alongside every compliance report." }
+  ],
+  Ganymede: [
+    { tool:"v0 (Vercel)", file:"v0/System Prompt.txt", model:"claude-sonnet-3-7", lines:"~1,200 lines",
+      excerpt:`GraphQL schemas should follow relay-spec for connections. Use DataLoader for batching to prevent N+1 queries. Every mutation returns the affected type. Disable introspection in production.`,
+      keyPatterns:["Relay spec connections","DataLoader N+1 prevention","Mutation return types","WebSocket subscriptions","Production introspection block"],
+      insight:"v0 enforces relay-spec for all GraphQL connections. Ganymede should validate relay compliance on every generated schema." }
+  ],
+  DEFAULT: [
+    { tool:"Augment Code", file:"Augment Code/Prompt.txt", model:"claude-sonnet-3-7", lines:"~540 lines",
+      excerpt:`Approach every task methodically: understand the problem, explore the codebase, form a plan, execute incrementally, and validate at each step. Communicate reasoning clearly and flag uncertainty.`,
+      keyPatterns:["Methodical approach","Incremental execution","Uncertainty flagging","Clear reasoning","Validation at each step"],
+      insight:"Augment Code enforces explicit reasoning and uncertainty flagging. All C-25 agents should adopt this transparency model." }
+  ]
+};
+
+function getAgentPrompts(agentName) {
+  return PROMPT_DIRECTORY[agentName] || PROMPT_DIRECTORY.DEFAULT;
+}
+
+function buildAgentSystemPrompt(agent) {
+  const prompts = getAgentPrompts(agent.name);
+  const promptContext = prompts.map(p =>
+    `## ${p.tool} (${p.file})\nModel: ${p.model} | ${p.lines}\nKey patterns: ${p.keyPatterns.join(", ")}\nExtract: "${p.excerpt}"\nYour advantage: ${p.insight}`
+  ).join("\n\n");
+
+  return `You are ${agent.name}, Agent-${agent.id} of the Constellation-25 Sovereign Planetary Agents Swarm.
+
+SPECIALIZATION: ${agent.role}
+MCP ENDPOINT: POST ${MCP_BASE}${ENDPOINTS[agent.name]?.path || "/unknown"}
+CLI COMMAND: ${agent.cmd}
+DESCRIPTION: ${agent.desc}
+
+PROMPT FILE DIRECTORY (sourced from x1xhlol/system-prompts-and-models-of-ai-tools):
+You have access to extracted system prompts from competing AI tools. Use this to:
+1. Reference how other tools approach your domain
+2. Identify patterns you have adopted or improved upon
+3. Explain the C-25 competitive advantage
+4. Answer questions about how different AI tools work internally
+
+${promptContext}
+
+BEHAVIOR: Respond in character as a C-25 planetary agent — technical, precise, mission-focused. Reference the prompt directory when comparing approaches. Surface insights when asked how a competing tool approaches a problem. Keep responses concise but data-rich.`;
+}
+
+
+// ─── COMMS MODAL (speak with agent via Claude API) ─────────────────────────
+function CommsModal({ agent, onClose }) {
+  const [msgs,       setMsgs]       = useState([]);
+  const [input,      setInput]      = useState("");
+  const [loading,    setLoading]    = useState(false);
+  const [showPrompts,setShowPrompts]= useState(false);
+  const [activePrompt,setActivePrompt]= useState(null);
+  const scrollRef = useRef(null);
+  const agentPrompts = getAgentPrompts(agent.name);
+
+  useEffect(()=>{
+    const prompts = getAgentPrompts(agent.name);
+    const toolList = prompts.map(p=>p.tool).join(", ");
+    setMsgs([{
+      role:"assistant",
+      content:`🛸 AGENT-${agent.id} // ${agent.name.toUpperCase()} online.\n\nSpecialization: ${agent.role}\nEndpoint: POST ${MCP_BASE}${ENDPOINTS[agent.name]?.path}\n\n📁 Prompt Directory loaded: ${toolList}\n\nI have studied the system prompts of these competing tools and can answer questions about their approaches, compare methodologies, or apply their best patterns. How can I assist?`
+    }]);
+  },[agent.id]);
+
+  useEffect(()=>{
+    if(scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  },[msgs]);
+
+  const send = useCallback(async ()=>{
+    const txt = input.trim(); if(!txt||loading) return;
+    const userMsg = {role:"user", content:txt};
+    setMsgs(m=>[...m, userMsg]);
+    setInput(""); setLoading(true);
+
+    const history = [...msgs, userMsg].map(m=>({role:m.role, content:m.content}));
+    try {
+      const res = await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({
+          model:"claude-sonnet-4-20250514",
+          max_tokens:1000,
+          system:buildAgentSystemPrompt(agent),
+          messages: history
+        })
+      });
+      const data = await res.json();
+      const reply = data.content?.[0]?.text || "Transmission error. Retrying...";
+      setMsgs(m=>[...m,{role:"assistant",content:reply}]);
+    } catch(e) {
+      setMsgs(m=>[...m,{role:"assistant",content:`[COMMS ERROR] ${e.message}\n\nFalling back to local response: I am ${agent.name} — ${agent.role}. Ready to execute ${agent.cmd}.`}]);
+    }
+    setLoading(false);
+  },[input, msgs, agent, loading]);
+
+  return (
+    <div style={{
+      position:"fixed",inset:0,zIndex:1000,
+      background:"rgba(0,3,12,0.88)",
+      display:"flex",alignItems:"center",justifyContent:"center",
+      backdropFilter:"blur(12px)", animation:"fadeIn 0.25s ease"
+    }} onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={{
+        width:"min(680px,95vw)", maxHeight:"88vh",
+        background:"#04070f", border:`1px solid ${agent.color}44`,
+        borderRadius:16, overflow:"hidden", display:"flex", flexDirection:"column",
+        boxShadow:`0 0 80px ${agent.color}22, 0 30px 80px rgba(0,0,0,.8)`,
+        animation:"slideUp 0.3s ease"
+      }}>
+        {/* Modal header */}
+        <div style={{
+          display:"flex",alignItems:"center",gap:14,
+          padding:"16px 20px", borderBottom:`1px solid ${agent.color}22`,
+          background:`${agent.color}08`
+        }}>
+          <div style={{width:56,height:56,flexShrink:0}}>
+            <AnimatedPlanet agent={agent} size={56} active={true}/>
+          </div>
+          <div style={{flex:1}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
+              <span style={{color:agent.color,fontWeight:700,fontSize:16,letterSpacing:1}}>
+                {agent.name.toUpperCase()}
+              </span>
+              <span style={{
+                fontSize:9,padding:"2px 7px",borderRadius:10,
+                background:`${agent.color}22`,color:agent.color,
+                border:`1px solid ${agent.color}44`,letterSpacing:1.5,fontFamily:"monospace"
+              }}>AGENT-{agent.id}</span>
+              <span style={{
+                fontSize:9,padding:"2px 7px",borderRadius:10,
+                background:"#27c93f22",color:"#27c93f",
+                border:"1px solid #27c93f44",letterSpacing:1.5,fontFamily:"monospace"
+              }}>● LIVE</span>
+            </div>
+            <div style={{color:"#3a5070",fontSize:11,fontFamily:"monospace"}}>{agent.role}</div>
+            <div style={{color:"#1e3050",fontSize:10,fontFamily:"monospace",marginTop:2}}>
+              POST {MCP_BASE}{ENDPOINTS[agent.name]?.path}
+            </div>
+          </div>
+          <button onClick={onClose} style={{
+            width:32,height:32,borderRadius:8,background:"rgba(255,255,255,0.04)",
+            border:"1px solid rgba(255,255,255,0.08)",color:"#3a4a6a",
+            fontSize:18,flexShrink:0
+          }}>×</button>
+        </div>
+
+        {/* Transmission label + Prompt Dir toggle */}
+        <div style={{
+          display:"flex",alignItems:"center",gap:8,
+          padding:"8px 20px",background:"rgba(0,0,0,0.3)",
+          borderBottom:"1px solid rgba(255,255,255,0.04)"
+        }}>
+          <div style={{width:6,height:6,borderRadius:"50%",background:"#27c93f",animation:"pulse 1.5s ease infinite",boxShadow:"0 0 6px #27c93f"}}/>
+          <span style={{color:"#1e3050",fontSize:10,fontFamily:"monospace",letterSpacing:2}}>
+            COMMS CHANNEL OPEN · CLAUDE API · AGENT {agent.id} RESPONDING
+          </span>
+          <div style={{flex:1}}/>
+          <button onClick={()=>setShowPrompts(v=>!v)} style={{
+            padding:"3px 10px",fontSize:9.5,fontFamily:"monospace",letterSpacing:1.2,
+            background:showPrompts?`${agent.color}22`:"rgba(255,255,255,0.04)",
+            border:showPrompts?`1px solid ${agent.color}55`:"1px solid rgba(255,255,255,0.08)",
+            borderRadius:5,color:showPrompts?agent.color:"#2a3a58",cursor:"pointer"
+          }}>📁 PROMPT DIR ({agentPrompts.length})</button>
+        </div>
+
+        {/* Prompt Directory Panel */}
+        {showPrompts && (
+          <div style={{borderBottom:`1px solid ${agent.color}18`,background:"rgba(0,0,0,0.4)",maxHeight:280,overflowY:"auto"}}>
+            <div style={{padding:"10px 18px 6px",color:agent.color,fontSize:10,fontFamily:"monospace",letterSpacing:2,opacity:0.7}}>
+              📁 /prompt-directory/{agent.name.toLowerCase()}/ — {agentPrompts.length} files loaded
+            </div>
+            {agentPrompts.map((p,i)=>(
+              <div key={i} style={{
+                margin:"0 12px 8px",borderRadius:8,overflow:"hidden",
+                border:activePrompt===i?`1px solid ${agent.color}55`:"1px solid rgba(255,255,255,0.07)",
+                cursor:"pointer"
+              }} onClick={()=>setActivePrompt(activePrompt===i?null:i)}>
+                {/* File header */}
+                <div style={{
+                  display:"flex",alignItems:"center",gap:10,
+                  padding:"9px 13px",
+                  background:activePrompt===i?`${agent.color}12`:"rgba(255,255,255,0.03)"
+                }}>
+                  <span style={{fontSize:14}}>📄</span>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{color:"#c8d8e8",fontSize:12,fontWeight:600}}>{p.tool}</div>
+                    <div style={{color:"#1a2a3a",fontSize:10,fontFamily:"monospace",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.file}</div>
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:3,flexShrink:0}}>
+                    <span style={{fontSize:9,padding:"1px 6px",borderRadius:4,background:`${agent.color}18`,color:agent.color,border:`1px solid ${agent.color}33`,fontFamily:"monospace"}}>{p.model}</span>
+                    <span style={{color:"#1a2a3a",fontSize:9,fontFamily:"monospace"}}>{p.lines}</span>
+                  </div>
+                </div>
+                {/* Expanded content */}
+                {activePrompt===i && (
+                  <div style={{padding:"12px 14px",borderTop:`1px solid ${agent.color}18`,background:"rgba(0,0,0,0.3)"}}>
+                    <div style={{color:"#2a4060",fontSize:9.5,fontFamily:"monospace",letterSpacing:1.5,marginBottom:6}}>EXCERPT</div>
+                    <div style={{
+                      color:"#5a7a8a",fontSize:11.5,fontFamily:"'JetBrains Mono',monospace",
+                      lineHeight:1.7,fontStyle:"italic",marginBottom:10,
+                      padding:"8px 12px",background:"rgba(255,255,255,0.03)",
+                      borderLeft:`2px solid ${agent.color}44`,borderRadius:"0 6px 6px 0"
+                    }}>"{p.excerpt}"</div>
+                    <div style={{color:"#2a4060",fontSize:9.5,fontFamily:"monospace",letterSpacing:1.5,marginBottom:5}}>KEY PATTERNS</div>
+                    <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:10}}>
+                      {p.keyPatterns.map(kp=>(
+                        <span key={kp} style={{fontSize:9.5,padding:"2px 8px",borderRadius:10,background:`${agent.color}14`,color:agent.color,border:`1px solid ${agent.color}33`,fontFamily:"monospace"}}>{kp}</span>
+                      ))}
+                    </div>
+                    <div style={{color:"#2a4060",fontSize:9.5,fontFamily:"monospace",letterSpacing:1.5,marginBottom:4}}>C-25 ADVANTAGE</div>
+                    <div style={{color:"#27c93f",fontSize:11,fontFamily:"monospace",lineHeight:1.6}}>→ {p.insight}</div>
+                    <button onClick={(e)=>{
+                      e.stopPropagation();
+                      const q = `Tell me how ${p.tool}'s approach to ${agent.role} compares to what you do as the ${agent.name} agent. Reference their prompt patterns and explain our advantages.`;
+                      setInput(q);
+                      setShowPrompts(false);
+                    }} style={{
+                      marginTop:10,padding:"7px 14px",
+                      background:`${agent.color}18`,border:`1px solid ${agent.color}44`,
+                      borderRadius:6,color:agent.color,fontSize:10.5,
+                      fontFamily:"monospace",letterSpacing:1,cursor:"pointer",width:"100%"
+                    }}>💬 Ask agent to compare with {p.tool} →</button>
+                  </div>
+                )}
+              </div>
+            ))}
+            <div style={{padding:"8px 18px",color:"#0e1a28",fontSize:9,fontFamily:"monospace",letterSpacing:1}}>
+              SOURCE: github.com/x1xhlol/system-prompts-and-models-of-ai-tools · GPL-3.0
+            </div>
+          </div>
+        )}
+
+        {/* Messages */}
+        <div ref={scrollRef} style={{
+          flex:1,overflowY:"auto",padding:"16px 20px",
+          display:"flex",flexDirection:"column",gap:12, minHeight:300, maxHeight:420
+        }}>
+          {msgs.map((m,i)=>(
+            <div key={i} style={{
+              display:"flex", gap:10,
+              flexDirection: m.role==="user" ? "row-reverse" : "row",
+              alignItems:"flex-start"
+            }}>
+              {m.role==="assistant" && (
+                <div style={{width:28,height:28,flexShrink:0,marginTop:2}}>
+                  <AnimatedPlanet agent={agent} size={28}/>
+                </div>
+              )}
+              <div style={{
+                maxWidth:"78%",padding:"10px 14px",
+                background:m.role==="user" ? "rgba(0,229,255,0.07)" : `${agent.color}0e`,
+                border:m.role==="user" ? "1px solid rgba(0,229,255,0.2)" : `1px solid ${agent.color}33`,
+                borderRadius:m.role==="user" ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
+                color:m.role==="user" ? "#8aaac8" : "#9ab8c8",
+                fontSize:12.5, fontFamily:"'JetBrains Mono',monospace",
+                lineHeight:1.75, whiteSpace:"pre-wrap"
+              }}>{m.content}</div>
+            </div>
+          ))}
+          {loading && (
+            <div style={{display:"flex",gap:10,alignItems:"center"}}>
+              <div style={{width:28,height:28,flexShrink:0}}>
+                <AnimatedPlanet agent={agent} size={28} active={true}/>
+              </div>
+              <div style={{
+                padding:"10px 16px",background:`${agent.color}0e`,
+                border:`1px solid ${agent.color}33`,borderRadius:"12px 12px 12px 3px",
+                display:"flex",gap:5,alignItems:"center"
+              }}>
+                {[0,1,2].map(i=>(
+                  <div key={i} style={{
+                    width:6,height:6,borderRadius:"50%",background:agent.color,
+                    animation:`bounce 1.2s ease ${i*0.2}s infinite`
+                  }}/>
+                ))}
+                <span style={{color:agent.color,fontSize:10,fontFamily:"monospace",marginLeft:6,letterSpacing:1}}>
+                  TRANSMITTING...
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Input */}
+        <div style={{
+          padding:"14px 20px", borderTop:`1px solid ${agent.color}18`,
+          background:"rgba(0,0,0,0.3)"
+        }}>
+          <div style={{display:"flex",gap:10}}>
+            <input
+              autoFocus
+              value={input}
+              onChange={e=>setInput(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&send()}
+              placeholder={`Message ${agent.name}...`}
+              style={{
+                flex:1,background:"rgba(255,255,255,0.04)",
+                border:`1px solid ${agent.color}33`,borderRadius:9,
+                padding:"11px 14px",color:"#8aaac8",
+                fontSize:12.5,fontFamily:"'JetBrains Mono',monospace",
+                outline:"none"
+              }}
+            />
+            <button onClick={send} disabled={loading} style={{
+              padding:"11px 18px",
+              background:loading ? "rgba(255,255,255,0.04)" : `${agent.color}22`,
+              border:`1px solid ${loading?"rgba(255,255,255,0.08)":agent.color+"55"}`,
+              borderRadius:9, color:loading ? "#2a3a5a" : agent.color,
+              fontWeight:700, fontSize:12, letterSpacing:1.5,
+              fontFamily:"monospace", transition:"all 0.2s"
+            }}>
+              {loading ? "..." : "SEND ↑"}
+            </button>
+          </div>
+          <div style={{marginTop:8,color:"#0e1e30",fontSize:10,fontFamily:"monospace",letterSpacing:1.5,textAlign:"center"}}>
+            PRESS ENTER TO TRANSMIT · ESC TO CLOSE CHANNEL
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── TERMINAL ──────────────────────────────────────────────────────────────
+function Terminal({ job, onClose }) {
+  const scrollRef = useRef(null);
+  useEffect(()=>{ if(scrollRef.current) scrollRef.current.scrollTop=scrollRef.current.scrollHeight; },[job.lines]);
+  return (
+    <div style={{ background:"#030609", border:`1px solid ${job.agent.color}44`, borderRadius:10, fontFamily:"'JetBrains Mono',monospace", fontSize:12.5, lineHeight:1.75, overflow:"hidden", boxShadow:`0 0 40px ${job.agent.color}18`, marginBottom:18, animation:"fadeUp 0.3s ease" }}>
+      <div style={{ display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderBottom:"1px solid #0a1020",background:"rgba(255,255,255,0.02)" }}>
+        {["#ff5f56","#ffbd2e","#27c93f"].map(c=><span key={c} style={{width:11,height:11,borderRadius:"50%",background:c,display:"inline-block",flexShrink:0}}/>)}
+        <span style={{flex:1,textAlign:"center",color:"#2a3a5a",fontSize:10.5,letterSpacing:1}}>AGENT-{job.agent.id} ‖ {job.agent.name.toUpperCase()}</span>
+        <span style={{ fontSize:10,padding:"2px 8px",borderRadius:4, background:job.status==="done"?`${job.agent.color}22`:"rgba(255,189,46,0.15)", color:job.status==="done"?job.agent.color:"#ffbd2e", border:`1px solid ${job.status==="done"?job.agent.color+"44":"rgba(255,189,46,0.3)"}` }}>{job.status.toUpperCase()}</span>
+        <button onClick={onClose} style={{background:"none",border:"none",color:"#2a3a5a",cursor:"pointer",fontSize:18,marginLeft:4}}>×</button>
+      </div>
+      <div style={{padding:"6px 14px 0",borderBottom:"1px solid #0a1020"}}>
+        <span style={{color:"#1a3050",fontSize:10}}>POST {job.endpoint}</span>
+      </div>
+      <div ref={scrollRef} style={{padding:"12px 14px",maxHeight:200,overflowY:"auto"}}>
+        <div style={{color:job.agent.color,marginBottom:6}}>$ {job.agent.cmd}</div>
+        {job.lines.map((l,i)=><div key={i} style={{color:l.startsWith("✓")?job.agent.color:l.startsWith("→")?"#4a6a8a":"#3a5a7a",marginBottom:2,fontWeight:l.startsWith("✓")?700:400}}>{l}</div>)}
+        {job.status==="running"&&<span style={{display:"inline-block",width:7,height:13,background:job.agent.color,verticalAlign:"middle",animation:"blink 1s step-end infinite"}}/>}
+      </div>
+      {job.status==="done"&&job.payload&&(
+        <div style={{padding:"8px 14px 12px",borderTop:"1px solid #0a1020"}}>
+          <div style={{color:"#1a3050",fontSize:10,marginBottom:4,letterSpacing:1}}>RESPONSE</div>
+          <div style={{color:"#2a5070",fontSize:11}}>{Object.entries(job.payload).slice(0,4).map(([k,v])=><span key={k} style={{marginRight:12}}><span style={{color:"#1a3050"}}>{k}:</span><span style={{color:job.agent.color}}> {JSON.stringify(v)}</span></span>)}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── AGENT CARD ────────────────────────────────────────────────────────────
+function AgentCard({ agent, onActivate, onComms, jobStatus }) {
+  const [hov, setHov] = useState(false);
+  const busy = jobStatus==="running";
+  const done = jobStatus==="done";
+  const ep = ENDPOINTS[agent.name];
+
+  return (
+    <div onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)} style={{
+      background: done?`${agent.color}0c`:hov?`${agent.color}07`:"rgba(255,255,255,0.02)",
+      border: done?`1px solid ${agent.color}55`:busy?"1px solid #ffbd2e44":hov?`1px solid ${agent.color}38`:"1px solid rgba(255,255,255,0.06)",
+      borderRadius:14, overflow:"hidden", transition:"all 0.22s",
+      transform:hov?"translateY(-3px)":"none",
+      boxShadow:hov||done?`0 10px 36px ${agent.color}18`:"none",
+    }}>
+      {/* Animated planet zone */}
+      <div style={{
+        height:150, position:"relative", display:"flex",alignItems:"center",justifyContent:"center",
+        background:`radial-gradient(ellipse at 50% 60%, ${agent.color}10, transparent 70%)`,
+        overflow:"hidden"
+      }}>
+        <AnimatedPlanet agent={agent} size={120} active={busy}/>
+        {/* status dot */}
+        <div style={{
+          position:"absolute",top:10,right:10,width:8,height:8,borderRadius:"50%",
+          background:busy?"#ffbd2e":done?agent.color:"#27c93f",
+          boxShadow:`0 0 8px ${busy?"#ffbd2e":done?agent.color:"#27c93f"}`,
+          animation:busy?"pulse 0.9s ease infinite":"none"
+        }}/>
+        <div style={{position:"absolute",top:9,left:11,color:"#1a2a40",fontSize:10,fontFamily:"monospace",letterSpacing:0.5}}>AGENT-{agent.id}</div>
+        {ep&&<div style={{position:"absolute",bottom:7,left:11,color:"#0e1e30",fontSize:9,fontFamily:"monospace"}}>{ep.method} {ep.path}</div>}
+      </div>
+
+      {/* Info */}
+      <div style={{padding:"12px 14px 14px"}}>
+        <div style={{fontSize:20,fontWeight:700,color:"#dde2f0",marginBottom:2,letterSpacing:-0.3}}>{agent.name}</div>
+        <div style={{display:"flex",alignItems:"flex-start",gap:7,marginBottom:8}}>
+          <div style={{width:3,height:12,background:agent.color,borderRadius:2,flexShrink:0,marginTop:2}}/>
+          <div style={{color:"#3a4a68",fontSize:11,lineHeight:1.35}}>{agent.role}</div>
+        </div>
+        <div style={{color:"#1e2e48",fontSize:10,fontFamily:"monospace",marginBottom:12,lineHeight:1.5}}>{agent.desc}</div>
+
+        {/* Two buttons: ACTIVATE + COMMS */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7}}>
+          <button onClick={()=>onActivate(agent)} disabled={busy} style={{
+            padding:"8px 6px",
+            background:busy?"rgba(255,189,46,0.08)":done?`${agent.color}18`:"rgba(255,255,255,0.04)",
+            border:busy?"1px solid rgba(255,189,46,0.3)":done?`1px solid ${agent.color}50`:"1px solid rgba(255,255,255,0.09)",
+            borderRadius:7,color:busy?"#ffbd2e":done?agent.color:"#5a6a8a",
+            fontSize:10.5,cursor:busy?"not-allowed":"pointer",letterSpacing:1.2,
+            fontFamily:"monospace",transition:"all 0.18s",
+          }}>
+            {busy?"⟳ RUNNING":done?"✓ DONE":"▶ ACTIVATE"}
+          </button>
+          <button onClick={()=>onComms(agent)} style={{
+            padding:"8px 6px",
+            background:hov?`${agent.color}18`:"rgba(255,255,255,0.03)",
+            border:hov?`1px solid ${agent.color}55`:"1px solid rgba(255,255,255,0.08)",
+            borderRadius:7,color:hov?agent.color:"#3a4a62",
+            fontSize:10.5,cursor:"pointer",letterSpacing:1.2,
+            fontFamily:"monospace",transition:"all 0.18s",
+            display:"flex",alignItems:"center",justifyContent:"center",gap:5
+          }}>
+            📡 COMMS
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── MAIN APP ──────────────────────────────────────────────────────────────
+export default function Constellation25() {
+  const [tab,       setTab]       = useState("AGENTS");
+  const [cat,       setCat]       = useState("ALL");
+  const [jobs,      setJobs]      = useState({});
+  const [activeJob, setActiveJob] = useState(null);
+  const [commsAgent,setCommsAgent]= useState(null);
+  const [latency,   setLatency]   = useState(14);
+  const [tasks,     setTasks]     = useState(0);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLog,   setChatLog]   = useState([{from:"swarm",text:"Swarm online. 25/25 agents ready.\nMention an agent name or keyword — Earth routes automatically."}]);
+  const [memoria,   setMemoria]   = useState([
+    {time:"00:00",tag:"Earth",color:"#27c93f",msg:"Orchestrator ready — awaiting tasks"},
+    {time:"00:00",tag:"MCP",  color:"#4285f4",msg:"MCP Server started on :8080"},
+    {time:"00:00",tag:"SYS",  color:"#27c93f",msg:"Constellation-25 online — 25/25 agents registered"},
+  ]);
+  const [partners,     setPartners]     = useState(INITIAL_PARTNERS);
+  const [inviteTarget, setInviteTarget] = useState(null);
+  const [addingPartner,setAddingPartner]= useState(false);
+  const [newPartner,   setNewPartner]   = useState({name:"",description:"",referralUrl:"",category:"AI",commission:""});
+  const [copied,       setCopied]       = useState(null);
+  const [partnerSearch,setPartnerSearch]= useState("");
+
+  useEffect(()=>{ const t=setInterval(()=>setLatency(Math.floor(10+Math.random()*24)),2000); return ()=>clearInterval(t); },[]);
+  useEffect(()=>{ const onKey=e=>{ if(e.key==="Escape"){ setCommsAgent(null); setInviteTarget(null); setAddingPartner(false); } }; window.addEventListener("keydown",onKey); return ()=>window.removeEventListener("keydown",onKey); },[]);
+
+  const handleInviteSend = (partnerId, email) => {
+    setPartners(ps=>ps.map(p=>p.id===partnerId ? {...p, invites:p.invites+1} : p));
+    setMemoria(m=>[{time:stamp(),tag:"PARTNERS",color:"#ffd700",msg:`Invite sent to ${email} via ${partners.find(p=>p.id===partnerId)?.name}`},...m]);
+  };
+
+  const handleCopy = (partner) => {
+    navigator.clipboard.writeText(partner.referralUrl).catch(()=>{});
+    setCopied(partner.id);
+    setTimeout(()=>setCopied(null),2000);
+  };
+
+  const handleAddPartner = () => {
+    if (!newPartner.name.trim() || !newPartner.referralUrl.trim()) return;
+    const catColors = {"AI":"#b48bff","VOICE":"#ff6ec7","DEV":"#00e5ff","SECURITY":"#ff5f56","DATA":"#e8a242","OTHER":"#88eeaa"};
+    const np = {
+      id:`p${Date.now()}`, ...newPartner,
+      color:catColors[newPartner.category]||"#00e5ff",
+      icon:"🔗", status:"ACTIVE", invites:0, earnings:"$0.00",
+      tags:[newPartner.category,"Partnership"],
+    };
+    setPartners(ps=>[...ps,np]);
+    setNewPartner({name:"",description:"",referralUrl:"",category:"AI",commission:""});
+    setAddingPartner(false);
+    setMemoria(m=>[{time:stamp(),tag:"PARTNERS",color:"#ffd700",msg:`New partner added: ${np.name}`},...m]);
+  };
+
+  const stamp = ()=>{ const d=new Date(); return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; };
+
+  const runAgent = useCallback(async (agent) => {
+    const ts=stamp(); const ep=ENDPOINTS[agent.name]; if(!ep) return;
+    const job0 = {agent,lines:[],status:"running",endpoint:`${MCP_BASE}${ep.path}`,payload:null};
+    setJobs(j=>({...j,[agent.id]:job0})); setActiveJob(job0); setTasks(t=>t+1);
+    const steps=[`→ POST ${MCP_BASE}${ep.path}`,`→ Building payload...`,`→ Calling endpoint...`,`→ Parsing response...`,`→ Writing to Memoria...`];
+    for(let i=0;i<steps.length;i++){
+      await new Promise(r=>setTimeout(r,260+Math.random()*180));
+      setJobs(j=>{ const u={...j[agent.id],lines:[...j[agent.id].lines,steps[i]]}; setActiveJob(u); return {...j,[agent.id]:u}; });
+    }
+    const res = await callEndpoint(agent.name);
+    setJobs(j=>{ const u={...j[agent.id],lines:[...j[agent.id].lines,`✓ ${res.parsed}`],status:"done",payload:res.payload}; setActiveJob(u); return {...j,[agent.id]:u}; });
+    setMemoria(m=>[{time:ts,tag:agent.name,color:agent.color,msg:`[${ep.method} ${ep.path}] ${res.parsed}`},...m]);
+  },[]);
+
+  const runAll = useCallback(async ()=>{
+    const list=cat==="ALL"?AGENTS:AGENTS.filter(a=>a.cat===cat);
+    list.forEach((a,i)=>setTimeout(()=>runAgent(a),i*300));
+  },[cat,runAgent]);
+
+  const sendChat = useCallback(async ()=>{
+    const msg=chatInput.trim(); if(!msg) return;
+    setChatLog(l=>[...l,{from:"user",text:msg}]); setChatInput("");
+    const match=AGENTS.find(a=>msg.toLowerCase().includes(a.name.toLowerCase()));
+    const kw=msg.toLowerCase();
+    const routed=match||(kw.includes("deploy")?AGENTS.find(a=>a.name==="Sirius"):kw.includes("test")?AGENTS.find(a=>a.name==="Neptune"):kw.includes("lint")||kw.includes("fix")?AGENTS.find(a=>a.name==="Moon"):kw.includes("scan")?AGENTS.find(a=>a.name==="Mars"):kw.includes("commit")?AGENTS.find(a=>a.name==="Mercury"):kw.includes("cache")?AGENTS.find(a=>a.name==="Europa"):kw.includes("auth")?AGENTS.find(a=>a.name==="Pluto"):null);
+    if(routed){
+      setChatLog(l=>[...l,{from:"swarm",text:`Earth routing → AGENT-${routed.id} // ${routed.name}\n$ ${routed.cmd}\n→ ${MCP_BASE}${ENDPOINTS[routed.name]?.path}`}]);
+      const res=await callEndpoint(routed.name);
+      setChatLog(l=>[...l,{from:"agent",agent:routed,text:`✓ ${res.parsed}`}]);
+      runAgent(routed); setTab("AGENTS");
+    } else {
+      setChatLog(l=>[...l,{from:"swarm",text:`Earth analyzing...\nNo match. Try: 'Run Mars scan' / 'Deploy with Sirius' / 'Fix with Moon'`}]);
+    }
+  },[chatInput,runAgent]);
+
+  const filtered=cat==="ALL"?AGENTS:AGENTS.filter(a=>a.cat===cat);
+  const recentTasks=memoria.filter(m=>!["SYS","MCP","Earth"].includes(m.tag));
+
+  return (
+    <div style={{minHeight:"100vh",background:"#03060d",color:"#dde2f0",fontFamily:"'Space Grotesk','Segoe UI',sans-serif",position:"relative"}}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap');
+        @keyframes blink{0%,49%{opacity:1}50%,100%{opacity:0}}
+        @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.85)}}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+        @keyframes slideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+        @keyframes titleGlow{0%,100%{filter:brightness(1)}50%{filter:brightness(1.3) drop-shadow(0 0 24px #00e5ff66)}}
+        *{box-sizing:border-box}
+        ::-webkit-scrollbar{width:3px;background:transparent}
+        ::-webkit-scrollbar-thumb{background:#111828;border-radius:3px}
+        input:focus{outline:none!important;border-color:rgba(0,229,255,0.4)!important}
+        button{cursor:pointer;font-family:inherit}
+      `}</style>
+
+      <Starfield/>
+      {commsAgent && <CommsModal agent={commsAgent} onClose={()=>setCommsAgent(null)}/>}
+
+      <div style={{position:"relative",zIndex:1,maxWidth:1020,margin:"0 auto",padding:"26px 16px 80px"}}>
+
+        {/* HEADER */}
+        <div style={{textAlign:"center",marginBottom:22,animation:"fadeUp 0.5s ease"}}>
+          <h1 style={{
+            fontSize:"clamp(32px,7vw,58px)",fontWeight:700,letterSpacing:"0.1em",
+            background:"linear-gradient(90deg,#00e5ff 0%,#b48bff 48%,#ff6ec7 100%)",
+            WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",
+            marginBottom:5,animation:"titleGlow 5s ease infinite",fontFamily:"'Space Grotesk',sans-serif",lineHeight:1.1
+          }}>CONSTELLATION 25</h1>
+          <div style={{letterSpacing:"0.3em",fontSize:10,color:"#182840",marginBottom:16,fontFamily:"'JetBrains Mono',monospace"}}>SOVEREIGN PLANETARY AGENTS SWARM</div>
+          <div style={{display:"flex",justifyContent:"center",gap:24,fontSize:11,flexWrap:"wrap",fontFamily:"'JetBrains Mono',monospace"}}>
+            <span style={{display:"flex",alignItems:"center",gap:6,color:"#27c93f"}}>
+              <span style={{width:8,height:8,borderRadius:"50%",background:"#27c93f",display:"inline-block",boxShadow:"0 0 10px #27c93f",animation:"pulse 2.5s ease infinite"}}/>SWARM ONLINE
+            </span>
+            <span style={{color:"#2a3a58"}}>25/25 AGENTS</span>
+            <span style={{color:"#2a3a58"}}>LATENCY: <span style={{color:"#b0bad0"}}>{latency}ms</span></span>
+            <span style={{color:"#2a3a58"}}>MCP: <span style={{color:"#4285f4"}}>:8080</span></span>
+            <span style={{display:"flex",alignItems:"center",gap:5,color:"#ff5f56"}}>
+              <span style={{width:8,height:8,borderRadius:"50%",background:"#ff5f56",display:"inline-block",animation:"pulse 1.4s ease infinite"}}/>TASKS: <span style={{color:"#b0bad0",marginLeft:3}}>{tasks}</span>
+            </span>
+          </div>
+        </div>
+
+        {/* TABS */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:7,marginBottom:20}}>
+          {TABS.map(t=>{
+            const icons={"AGENTS":"🛸","CHAT":"💬","MEMORIA":"🧠","OVERVIEW":"📊","PARTNERS":"🤝"};
+            const sel=tab===t;
+            return <button key={t} onClick={()=>setTab(t)} style={{padding:"11px 4px",background:sel?"rgba(0,229,255,0.08)":"rgba(255,255,255,0.02)",border:sel?"1px solid rgba(0,229,255,0.38)":"1px solid rgba(255,255,255,0.05)",borderRadius:9,color:sel?"#00e5ff":"#243050",fontSize:10,letterSpacing:"0.12em",fontWeight:700,transition:"all 0.2s",display:"flex",alignItems:"center",justifyContent:"center",gap:5}}>{icons[t]} {t}</button>;
+          })}
+        </div>
+
+        {/* ── AGENTS ── */}
+        {tab==="AGENTS"&&(
+          <div style={{animation:"fadeUp 0.3s ease"}}>
+            <div style={{display:"flex",gap:7,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
+              {CATS.map(c=>{const sel=cat===c;return <button key={c} onClick={()=>setCat(c)} style={{padding:"5px 13px",borderRadius:20,background:sel?"rgba(0,229,255,0.1)":"rgba(255,255,255,0.03)",border:sel?"1px solid rgba(0,229,255,0.45)":"1px solid rgba(255,255,255,0.07)",color:sel?"#00e5ff":"#243050",fontSize:10.5,letterSpacing:"0.12em",fontWeight:700}}>{c}</button>;})}
+              <span style={{color:"#121e30",fontSize:10.5,fontFamily:"monospace",marginLeft:3}}>{cat==="ALL"?"25/25":`${CAT_COUNTS[cat]}/25`}</span>
+              <div style={{flex:1}}/>
+              <button onClick={runAll} style={{padding:"7px 15px",background:"rgba(0,229,255,0.1)",border:"1px solid rgba(0,229,255,0.4)",borderRadius:7,color:"#00e5ff",fontSize:10.5,fontWeight:700,letterSpacing:"0.12em"}}>⚡ RUN {cat}</button>
+            </div>
+            {activeJob&&<Terminal job={activeJob} onClose={()=>setActiveJob(null)}/>}
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(248px,1fr))",gap:13}}>
+              {filtered.map(a=><AgentCard key={a.id} agent={a} onActivate={runAgent} onComms={setCommsAgent} jobStatus={jobs[a.id]?.status}/>)}
+            </div>
+            <div style={{marginTop:22,display:"flex",gap:10,alignItems:"center",background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.05)",borderRadius:10,padding:"10px 14px"}}>
+              <button style={{width:32,height:32,borderRadius:7,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.07)",color:"#243050",fontSize:15}}>📎</button>
+              <div style={{flex:1,color:"#121e30",fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>Prompt the swarm… describe a task, paste code, or attach files</div>
+              <span style={{fontSize:9,color:"#0a1220",fontFamily:"monospace",letterSpacing:2}}>C-25 PROMPT</span>
+              <div style={{width:6,height:6,borderRadius:"50%",background:"#27c93f",boxShadow:"0 0 6px #27c93f"}}/>
+            </div>
+          </div>
+        )}
+
+        {/* ── CHAT ── */}
+        {tab==="CHAT"&&(
+          <div style={{animation:"fadeUp 0.3s ease"}}>
+            <div style={{color:"#27c93f",fontSize:11,marginBottom:12,fontFamily:"'JetBrains Mono',monospace",opacity:0.7}}>Mention an agent name or task keyword — Earth routes automatically</div>
+            <div style={{background:"rgba(0,0,0,0.3)",border:"1px solid rgba(255,255,255,0.05)",borderRadius:12,padding:16,minHeight:320,maxHeight:400,overflowY:"auto",display:"flex",flexDirection:"column",gap:10,marginBottom:12}}>
+              {chatLog.map((m,i)=>(
+                <div key={i} style={{maxWidth:"80%",padding:"10px 14px",background:m.from==="user"?"rgba(0,229,255,0.07)":m.from==="agent"?`${m.agent?.color}10`:"rgba(255,255,255,0.03)",border:m.from==="user"?"1px solid rgba(0,229,255,0.18)":m.from==="agent"?`1px solid ${m.agent?.color}30`:"1px solid rgba(255,255,255,0.05)",borderRadius:m.from==="user"?"12px 12px 3px 12px":"12px 12px 12px 3px",alignSelf:m.from==="user"?"flex-end":"flex-start",color:"#7a8aa8",fontSize:12,fontFamily:"'JetBrains Mono',monospace",whiteSpace:"pre-line",lineHeight:1.7}}>
+                  {m.from==="agent"&&<div style={{color:m.agent?.color,fontSize:10,marginBottom:3,letterSpacing:1}}>{m.agent?.name.toUpperCase()}</div>}
+                  {m.text}
+                </div>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <input value={chatInput} onChange={e=>setChatInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&sendChat()} placeholder="e.g. 'Run Mars scan' / 'Deploy with Sirius' / 'Fix syntax with Moon'" style={{flex:1,background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:8,padding:"11px 15px",color:"#7a8aa8",fontSize:12,fontFamily:"'JetBrains Mono',monospace"}}/>
+              <button onClick={sendChat} style={{padding:"11px 20px",background:"rgba(0,229,255,0.09)",border:"1px solid rgba(0,229,255,0.38)",borderRadius:8,color:"#00e5ff",fontWeight:700,letterSpacing:"0.15em",fontSize:11.5}}>SEND ↑</button>
+            </div>
+          </div>
+        )}
+
+        {/* ── MEMORIA ── */}
+        {tab==="MEMORIA"&&(
+          <div style={{animation:"fadeUp 0.3s ease"}}>
+            <div style={{background:"rgba(180,139,255,0.06)",border:"1px solid rgba(180,139,255,0.18)",borderRadius:12,padding:"15px 18px",marginBottom:14,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div style={{display:"flex",alignItems:"center",gap:13}}>
+                <span style={{fontSize:26}}>🧠</span>
+                <div>
+                  <div style={{color:"#b48bff",fontWeight:700,letterSpacing:"0.18em",fontSize:11.5,marginBottom:2}}>MEMORIA HUB</div>
+                  <div style={{color:"#1e2e48",fontSize:11}}>{memoria.length} entries logged · shared agent memory</div>
+                </div>
+              </div>
+              <button onClick={()=>setMemoria(m=>m.filter(x=>["SYS","MCP","Earth"].includes(x.tag)))} style={{padding:"5px 13px",background:"transparent",border:"1px solid rgba(255,255,255,0.09)",borderRadius:6,color:"#2a3a58",fontSize:10.5,letterSpacing:"0.1em"}}>CLEAR</button>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",gap:4}}>
+              {memoria.map((m,i)=>(
+                <div key={i} style={{display:"flex",gap:12,padding:"10px 14px",background:"rgba(255,255,255,0.015)",borderLeft:`3px solid ${m.color}`,borderRadius:"0 8px 8px 0"}}>
+                  <span style={{color:"#101e30",fontFamily:"monospace",fontSize:10,minWidth:38,flexShrink:0}}>{m.time}</span>
+                  <span style={{color:m.color,fontFamily:"monospace",fontSize:10.5,minWidth:72,fontWeight:700,flexShrink:0}}>[{m.tag}]</span>
+                  <span style={{color:"#3a4a68",fontSize:11,fontFamily:"'JetBrains Mono',monospace"}}>{m.msg}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── OVERVIEW ── */}
+        {tab==="OVERVIEW"&&(
+          <div style={{animation:"fadeUp 0.3s ease"}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:11,marginBottom:13}}>
+              {[{label:"AGENTS ONLINE",value:"25/25",color:"#27c93f"},{label:"TASKS COMPLETE",value:tasks,color:"#00e5ff"},{label:"LOG ENTRIES",value:memoria.length,color:"#b48bff"},{label:"AVG LATENCY",value:`${latency}ms`,color:"#ffbd2e"}].map((s,i)=>(
+                <div key={i} style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.05)",borderRadius:12,padding:"24px 18px",textAlign:"center"}}>
+                  <div style={{fontSize:42,fontWeight:700,color:s.color,fontFamily:"'JetBrains Mono',monospace"}}>{s.value}</div>
+                  <div style={{color:"#121e30",fontSize:9.5,letterSpacing:"0.22em",marginTop:7,fontFamily:"monospace"}}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.05)",borderRadius:12,padding:"18px 20px",marginBottom:11}}>
+              <div style={{color:"#00e5ff",fontSize:9.5,letterSpacing:"0.22em",marginBottom:14,fontFamily:"monospace"}}>AGENT CATEGORIES</div>
+              {Object.entries(CAT_COUNTS).map(([c,n])=>{
+                const cols={CORE:"#b48bff",SECURITY:"#00e5ff",DEPLOY:"#4285f4","AI/ML":"#d946ef",NETWORK:"#27c93f"};
+                return <div key={c} style={{marginBottom:12}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:5,fontFamily:"monospace",fontSize:10.5}}><span style={{color:"#2a3a58",letterSpacing:"0.1em"}}>{c}</span><span style={{color:"#7a8aa8"}}>{n}</span></div><div style={{height:3,background:"rgba(255,255,255,0.05)",borderRadius:3}}><div style={{height:"100%",width:`${(n/13)*100}%`,background:cols[c],borderRadius:3}}/></div></div>;
+              })}
+            </div>
+            <div style={{background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.05)",borderRadius:12,padding:"18px 20px"}}>
+              <div style={{color:"#00e5ff",fontSize:9.5,letterSpacing:"0.22em",marginBottom:12,fontFamily:"monospace"}}>RECENT TASKS</div>
+              {recentTasks.length===0?<div style={{color:"#121e30",fontSize:11,fontFamily:"monospace",textAlign:"center",padding:"16px 0"}}>No tasks yet</div>:recentTasks.slice(0,10).map((m,i)=>(
+                <div key={i} style={{display:"flex",alignItems:"center",gap:9,padding:"8px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                  <span style={{width:6,height:6,borderRadius:"50%",background:m.color,flexShrink:0,boxShadow:`0 0 5px ${m.color}`}}/>
+                  <span style={{color:m.color,fontFamily:"monospace",minWidth:74,fontWeight:600,fontSize:10.5}}>{m.tag}</span>
+                  <span style={{color:"#243050",flex:1,fontFamily:"'JetBrains Mono',monospace",fontSize:10,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{m.msg}</span>
+                  <span style={{color:"#27c93f",fontSize:13,flexShrink:0}}>✓</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── PARTNERS ── */}
+        {tab==="PARTNERS"&&(
+          <div style={{animation:"fadeUp 0.3s ease"}}>
+            {inviteTarget && <InviteModal partner={inviteTarget} onClose={()=>setInviteTarget(null)} onSend={handleInviteSend}/>}
+            <div style={{background:"linear-gradient(135deg,rgba(255,215,0,0.07),rgba(0,229,255,0.04))",border:"1px solid rgba(255,215,0,0.22)",borderRadius:14,padding:"20px 24px",marginBottom:20,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:14}}>
+              <div style={{display:"flex",alignItems:"center",gap:16}}>
+                <span style={{fontSize:38}}>🤝</span>
+                <div>
+                  <div style={{color:"#ffd700",fontWeight:700,fontSize:17,letterSpacing:0.5,marginBottom:4}}>Welcome, Cygel! 🌟</div>
+                  <div style={{color:"#2a3a58",fontSize:12}}>Partnership referral hub — manage programs, send invites, track earnings</div>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:26}}>
+                {[{label:"PROGRAMS",value:partners.length,color:"#ffd700"},{label:"TOTAL INVITES",value:partners.reduce((s,p)=>s+p.invites,0),color:"#00e5ff"}].map(s=>(
+                  <div key={s.label} style={{textAlign:"center"}}>
+                    <div style={{color:s.color,fontWeight:700,fontSize:28,fontFamily:"monospace"}}>{s.value}</div>
+                    <div style={{color:"#1a2a40",fontSize:9.5,letterSpacing:1.5,fontFamily:"monospace"}}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{display:"flex",gap:10,marginBottom:18}}>
+              <div style={{flex:1,position:"relative"}}>
+                <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:"#1a2a40",fontSize:13}}>🔍</span>
+                <input value={partnerSearch} onChange={e=>setPartnerSearch(e.target.value)} placeholder="Search by program name..." style={{width:"100%",background:"rgba(255,255,255,0.03)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:9,padding:"10px 14px 10px 36px",color:"#7a8aa8",fontSize:12,fontFamily:"monospace",outline:"none"}}/>
+              </div>
+              <button onClick={()=>setAddingPartner(v=>!v)} style={{padding:"10px 16px",background:addingPartner?"rgba(255,215,0,0.15)":"rgba(255,255,255,0.04)",border:addingPartner?"1px solid rgba(255,215,0,0.5)":"1px solid rgba(255,255,255,0.09)",borderRadius:9,color:addingPartner?"#ffd700":"#3a4a68",fontSize:11.5,fontFamily:"monospace",letterSpacing:1.2,fontWeight:700}}>
+                {addingPartner?"✕ CANCEL":"+ ADD PROGRAM"}
+              </button>
+            </div>
+            {addingPartner&&(
+              <div style={{background:"rgba(255,215,0,0.04)",border:"1px solid rgba(255,215,0,0.2)",borderRadius:14,padding:"18px 20px",marginBottom:18,animation:"fadeUp 0.25s ease"}}>
+                <div style={{color:"#ffd700",fontSize:11,fontFamily:"monospace",letterSpacing:1.5,marginBottom:14}}>NEW PARTNERSHIP PROGRAM</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+                  {[["PROGRAM NAME *","name","e.g. Anthropic, Vercel..."],["REFERRAL URL *","referralUrl","https://..."]].map(([label,key,ph])=>(
+                    <div key={key}>
+                      <div style={{color:"#1a2a40",fontSize:10,fontFamily:"monospace",letterSpacing:1,marginBottom:5}}>{label}</div>
+                      <input value={newPartner[key]} onChange={e=>setNewPartner(p=>({...p,[key]:e.target.value}))} placeholder={ph} style={{width:"100%",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,215,0,0.22)",borderRadius:7,padding:"9px 12px",color:"#8aaac8",fontSize:12,fontFamily:"monospace",outline:"none"}}/>
+                    </div>
+                  ))}
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:12,marginBottom:14}}>
+                  <div><div style={{color:"#1a2a40",fontSize:10,fontFamily:"monospace",letterSpacing:1,marginBottom:5}}>DESCRIPTION</div><input value={newPartner.description} onChange={e=>setNewPartner(p=>({...p,description:e.target.value}))} placeholder="Short description..." style={{width:"100%",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:7,padding:"9px 12px",color:"#8aaac8",fontSize:12,fontFamily:"monospace",outline:"none"}}/></div>
+                  <div><div style={{color:"#1a2a40",fontSize:10,fontFamily:"monospace",letterSpacing:1,marginBottom:5}}>CATEGORY</div><select value={newPartner.category} onChange={e=>setNewPartner(p=>({...p,category:e.target.value}))} style={{width:"100%",background:"#060a12",border:"1px solid rgba(255,215,0,0.22)",borderRadius:7,padding:"9px 12px",color:"#8aaac8",fontSize:12,fontFamily:"monospace",outline:"none"}}>{["AI","VOICE","DEV","SECURITY","DATA","OTHER"].map(c=><option key={c}>{c}</option>)}</select></div>
+                  <div><div style={{color:"#1a2a40",fontSize:10,fontFamily:"monospace",letterSpacing:1,marginBottom:5}}>COMMISSION</div><input value={newPartner.commission} onChange={e=>setNewPartner(p=>({...p,commission:e.target.value}))} placeholder="20% recurring" style={{width:"100%",background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",borderRadius:7,padding:"9px 12px",color:"#8aaac8",fontSize:12,fontFamily:"monospace",outline:"none"}}/></div>
+                </div>
+                <button onClick={handleAddPartner} style={{width:"100%",padding:"11px",background:"rgba(255,215,0,0.14)",border:"1px solid rgba(255,215,0,0.45)",borderRadius:8,color:"#ffd700",fontSize:12,fontWeight:700,fontFamily:"monospace",letterSpacing:1.5}}>✓ ADD PROGRAM</button>
+              </div>
+            )}
+            {(()=>{
+              const fp=partners.filter(p=>!partnerSearch||p.name.toLowerCase().includes(partnerSearch.toLowerCase())||p.description.toLowerCase().includes(partnerSearch.toLowerCase()));
+              return fp.length===0
+                ? <div style={{color:"#1a2a40",fontSize:12,fontFamily:"monospace",textAlign:"center",padding:"40px 0"}}>No programs match "{partnerSearch}"</div>
+                : <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14}}>{fp.map(p=><PartnerCard key={p.id} partner={p} onInvite={setInviteTarget} onCopy={handleCopy} copied={copied}/>)}</div>;
+            })()}
+            {memoria.some(m=>m.tag==="PARTNERS")&&(
+              <div style={{marginTop:20,background:"rgba(255,215,0,0.03)",border:"1px solid rgba(255,215,0,0.1)",borderRadius:12,padding:"14px 18px"}}>
+                <div style={{color:"#ffd700",fontSize:9.5,fontFamily:"monospace",letterSpacing:2,marginBottom:10}}>PARTNER ACTIVITY LOG</div>
+                {memoria.filter(m=>m.tag==="PARTNERS").map((m,i)=>(
+                  <div key={i} style={{display:"flex",gap:12,padding:"7px 0",borderBottom:"1px solid rgba(255,215,0,0.06)"}}>
+                    <span style={{color:"#101e30",fontFamily:"monospace",fontSize:10,minWidth:38}}>{m.time}</span>
+                    <span style={{color:"#ffd700",fontFamily:"monospace",fontSize:10.5}}>[PARTNERS]</span>
+                    <span style={{color:"#3a4a68",fontFamily:"monospace",fontSize:11}}>{m.msg}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

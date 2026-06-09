@@ -1,0 +1,31 @@
+# deps
+node_modules/
+.pnp
+.pnp.js
+
+# next
+.next/
+out/
+build/
+
+# env — NEVER commit real tokens
+.env
+.env.local
+.env.*.local
+!.env.local.example
+
+# vercel
+.vercel
+
+# os
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
+logs/
+
+# android / termux
+*.apk
+*.keystore
+local.properties

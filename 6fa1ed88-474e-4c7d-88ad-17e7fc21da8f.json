@@ -1,0 +1,177 @@
+{
+  "Mercury": {
+    "module": "MyBuyO",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Venus": {
+    "module": "VideoCourts",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Earth": {
+    "module": "ExplorerMars",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Mars": {
+    "module": "BioBLOC",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Jupiter": {
+    "module": "NLP2CODE",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Saturn": {
+    "module": "CoManDeck",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Uranus": {
+    "module": "SLAMAR",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Neptune": {
+    "module": "HeylloGen",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Pluto": {
+    "module": "TrustOps",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Ceres": {
+    "module": "SentryOps",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Eris": {
+    "module": "IdentityHub",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Haumea": {
+    "module": "SovereignDNS",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Makemake": {
+    "module": "EdgeAgents",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Io": {
+    "module": "VectorVault",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Europa": {
+    "module": "DataLake",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Ganymede": {
+    "module": "BrokerX",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Callisto": {
+    "module": "KeyMGR",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Titan": {
+    "module": "AuditTrail",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Rhea": {
+    "module": "Cockpit",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Iapetus": {
+    "module": "Dedilink",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Dione": {
+    "module": "LoadBalancer",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Tethys": {
+    "module": "VPC",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Enceladus": {
+    "module": "Kapsule",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Mimas": {
+    "module": "GenerativeAPI",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  },
+  "Oberon": {
+    "module": "ManagedInference",
+    "owner": "",
+    "sla": "Silver (99.5%)",
+    "region": "US-East",
+    "status": "Assigned"
+  }
+}

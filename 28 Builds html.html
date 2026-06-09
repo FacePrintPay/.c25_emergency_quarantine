@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TOTAL RECALL — Sovereign Build Registry</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=VT323&family=Exo+2:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --void:     #02040a;
+  --deep:     #060d1c;
+  --panel:    #080f1e;
+  --surface:  #0c1628;
+  --rim:      #0e2040;
+  --c-blue:   #00d4ff;
+  --c-green:  #00ff8c;
+  --c-gold:   #ffb400;
+  --c-red:    #ff3355;
+  --c-pink:   #ff00bb;
+  --c-purple: #aa44ff;
+  --c-white:  #e8f4ff;
+  --c-dim:    #2a4060;
+  --c-mid:    #4a6888;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--void);
+  color: var(--c-white);
+  font-family: 'Exo 2', sans-serif;
+  font-weight: 300;
+  min-height: 100vh;
+  overflow-x: hidden;
+  cursor: crosshair;
+}
+
+/* ── STAR FIELD ─────────────────────────────────────── */
+#stars {
+  position: fixed; inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+.star {
+  position: absolute;
+  border-radius: 50%;
+  background: #fff;
+  animation: twinkle var(--d) ease-in-out infinite;
+  animation-delay: var(--delay);
+}
+@keyframes twinkle {
+  0%,100% { opacity: var(--lo); transform: scale(1); }
+  50%      { opacity: var(--hi); transform: scale(1.4); }
+}
+
+/* ── SCAN LINE ──────────────────────────────────────── */
+body::after {
+  content: '';
+  position: fixed;
+  left: 0; top: -4px;
+  width: 100%; height: 3px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(0,212,255,0.0) 20%,
+    rgba(0,212,255,0.4) 50%,
+    rgba(0,212,255,0.0) 80%,
+    transparent 100%);
+  animation: scanline 10s linear infinite;
+  pointer-events: none;
+  z-index: 9999;
+}
+@keyframes scanline { to { top: 110vh; } }
+
+/* ── HEADER ─────────────────────────────────────────── */
+header {
+  position: relative;
+  z-index: 2;
+  padding: 56px 40px 40px;
+  text-align: center;
+  border-bottom: 1px solid var(--rim);
+  background: linear-gradient(180deg, rgba(0,100,200,0.06) 0%, transparent 100%);
+}
+
+.logo-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 8px;
+}
+
+.logo-icon {
+  font-size: 2.8rem;
+  filter: drop-shadow(0 0 16px var(--c-blue));
+  animation: icon-pulse 4s ease-in-out infinite;
+}
+@keyframes icon-pulse {
+  0%,100% { filter: drop-shadow(0 0 16px var(--c-blue)); }
+  50%      { filter: drop-shadow(0 0 32px var(--c-blue)) drop-shadow(0 0 60px rgba(0,212,255,0.4)); }
+}
+
+.site-title {
+  font-family: 'Orbitron', monospace;
+  font-weight: 900;
+  font-size: clamp(2rem, 7vw, 5rem);
+  letter-spacing: 0.18em;
+  background: linear-gradient(135deg, var(--c-blue) 0%, var(--c-green) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-transform: uppercase;
+}
+
+.tagline {
+  font-family: 'VT323', monospace;
+  font-size: 1.1rem;
+  letter-spacing: 0.35em;
+  color: var(--c-mid);
+  text-transform: uppercase;
+  margin-top: 6px;
+}
+
+/* live indicator */
+.live-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 22px;
+  padding: 9px 24px;
+  border: 1px solid var(--c-green);
+  border-radius: 3px;
+  background: rgba(0,255,140,0.04);
+  font-family: 'VT323', monospace;
+  font-size: 1.05rem;
+  letter-spacing: 0.25em;
+  color: var(--c-green);
+  text-shadow: 0 0 12px var(--c-green);
+  animation: strip-glow 2.5s ease-in-out infinite;
+}
+@keyframes strip-glow {
+  0%,100% { box-shadow: 0 0 8px rgba(0,255,140,0.2); }
+  50%      { box-shadow: 0 0 24px rgba(0,255,140,0.5); }
+}
+.pulse-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--c-green);
+  box-shadow: 0 0 8px var(--c-green);
+  animation: dot-blink 1s ease-in-out infinite;
+}
+@keyframes dot-blink { 50% { opacity: 0.15; } }
+
+/* stat row */
+.stats {
+  display: flex;
+  justify-content: center;
+  gap: clamp(20px, 5vw, 60px);
+  margin-top: 32px;
+  flex-wrap: wrap;
+}
+.stat { text-align: center; }
+.stat-n {
+  font-family: 'Orbitron', monospace;
+  font-weight: 700;
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  color: var(--c-gold);
+  text-shadow: 0 0 20px var(--c-gold);
+  line-height: 1;
+}
+.stat-l {
+  font-family: 'VT323', monospace;
+  font-size: 0.85rem;
+  letter-spacing: 0.3em;
+  color: var(--c-dim);
+  text-transform: uppercase;
+  margin-top: 5px;
+}
+
+/* ── FILTER BAR ──────────────────────────────────────── */
+.filter-zone {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 20px;
+  background: rgba(2,4,10,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--rim);
+  flex-wrap: wrap;
+}
+.fb {
+  font-family: 'VT323', monospace;
+  font-size: 0.95rem;
+  letter-spacing: 0.22em;
+  padding: 5px 18px;
+  border: 1px solid var(--c-dim);
+  background: transparent;
+  color: var(--c-mid);
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.18s;
+  border-radius: 2px;
+}
+.fb:hover, .fb.on {
+  border-color: var(--c-blue);
+  color: var(--c-blue);
+  background: rgba(0,212,255,0.06);
+  text-shadow: 0 0 10px var(--c-blue);
+  box-shadow: 0 0 12px rgba(0,212,255,0.15);
+}
+
+/* ── GRID ────────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 18px;
+  padding: 32px 28px;
+  max-width: 1560px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 2;
+}
+
+/* ── CARD ────────────────────────────────────────────── */
+.card {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--rim);
+  border-radius: 4px;
+  overflow: hidden;
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+  animation: rise 0.55s ease both;
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(24px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.card:hover {
+  transform: translateY(-5px) scale(1.01);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,212,255,0.15);
+  z-index: 3;
+}
+/* hero spans 2 columns */
+.card.hero { grid-column: span 2; }
+@media (max-width: 680px) { .card.hero { grid-column: span 1; } }
+
+/* staggered animation delays */
+.card:nth-child(1)  { animation-delay: 0.04s; }
+.card:nth-child(2)  { animation-delay: 0.08s; }
+.card:nth-child(3)  { animation-delay: 0.12s; }
+.card:nth-child(4)  { animation-delay: 0.16s; }
+.card:nth-child(5)  { animation-delay: 0.20s; }
+.card:nth-child(6)  { animation-delay: 0.24s; }
+.card:nth-child(7)  { animation-delay: 0.28s; }
+.card:nth-child(8)  { animation-delay: 0.32s; }
+.card:nth-child(9)  { animation-delay: 0.36s; }
+.card:nth-child(10) { animation-delay: 0.40s; }
+.card:nth-child(n+11) { animation-delay: 0.44s; }
+
+/* top accent bar */
+.bar {
+  height: 3px;
+  width: 100%;
+}
+/* glow corners */
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; right: 0;
+  width: 40px; height: 40px;
+  background: radial-gradient(circle at top right, var(--glow-col, rgba(0,212,255,0.08)), transparent 70%);
+  pointer-events: none;
+}
+
+.body { padding: 20px 22px 18px; }
+
+.row1 {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.icon { font-size: 2rem; line-height: 1; }
+
+.badge {
+  font-family: 'VT323', monospace;
+  font-size: 0.8rem;
+  letter-spacing: 0.18em;
+  padding: 3px 10px;
+  border-radius: 2px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.b-live   { background:rgba(0,255,140,0.12); color:var(--c-green);  border:1px solid var(--c-green);  text-shadow:0 0 8px var(--c-green);  animation:strip-glow 2s ease-in-out infinite; }
+.b-deploy { background:rgba(0,212,255,0.08); color:var(--c-blue);   border:1px solid rgba(0,212,255,0.5); }
+.b-agent  { background:rgba(170,68,255,0.1); color:var(--c-purple); border:1px solid rgba(170,68,255,0.5); }
+.b-pipe   { background:rgba(255,180,0,0.08); color:var(--c-gold);   border:1px solid rgba(255,180,0,0.4); }
+.b-evid   { background:rgba(255,51,85,0.08); color:var(--c-red);    border:1px solid rgba(255,51,85,0.4); }
+.b-tool   { background:rgba(74,104,136,0.15);color:#8ab0d0;         border:1px solid rgba(74,104,136,0.5); }
+
+.cname {
+  font-family: 'Orbitron', monospace;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+  margin-bottom: 5px;
+  line-height: 1.3;
+  color: var(--c-white);
+}
+.card.hero .cname { font-size: 1.35rem; }
+
+.cscript {
+  font-family: 'VT323', monospace;
+  font-size: 0.82rem;
+  color: var(--c-mid);
+  margin-bottom: 10px;
+  line-height: 1.45;
+  word-break: break-all;
+}
+.cscript em { color: var(--c-blue); font-style: normal; opacity: 0.75; }
+
+.cdesc {
+  font-size: 0.78rem;
+  color: #6a90b8;
+  line-height: 1.65;
+  margin-bottom: 16px;
+  min-height: 50px;
+}
+.card.hero .cdesc { font-size: 0.88rem; min-height: auto; }
+
+.foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid var(--rim);
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.fdate {
+  font-family: 'VT323', monospace;
+  font-size: 0.8rem;
+  color: var(--c-dim);
+  letter-spacing: 0.1em;
+}
+.fstatus {
+  font-family: 'VT323', monospace;
+  font-size: 0.8rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+.s-done   { color: var(--c-green); }
+.s-live   { color: var(--c-blue);  }
+.s-arch   { color: var(--c-mid);   }
+.s-alert  { color: var(--c-red);   }
+.s-launch { color: var(--c-gold);  }
+
+.hidden { display: none !important; }
+
+/* ── FOOTER ──────────────────────────────────────────── */
+footer {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 36px 20px;
+  border-top: 1px solid var(--rim);
+  font-family: 'VT323', monospace;
+  font-size: 0.9rem;
+  letter-spacing: 0.3em;
+  color: var(--c-dim);
+  text-transform: uppercase;
+}
+footer span { color: var(--c-green); display: block; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<!-- Star field -->
+<div id="stars"></div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo-row">
+    <span class="logo-icon">🌌</span>
+    <h1 class="site-title">Total Recall</h1>
+    <span class="logo-icon">🌌</span>
+  </div>
+  <div class="tagline">Sovereign Build Registry · u0_a510 · Termux · Feb 27 2026</div>
+
+  <div class="live-strip">
+    <span class="pulse-dot"></span>
+    LIVE — aikre8tivegenesis.vercel.app — 76 CONFIRMED HITS
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-n">28</div><div class="stat-l">Projects</div></div>
+    <div class="stat"><div class="stat-n">80+</div><div class="stat-l">Scripts</div></div>
+    <div class="stat"><div class="stat-n">23</div><div class="stat-l">Clean Builds</div></div>
+    <div class="stat"><div class="stat-n">365</div><div class="stat-l">Days Active</div></div>
+    <div class="stat"><div class="stat-n" style="color:var(--c-red)">OCT 30</div><div class="stat-l">First Build</div></div>
+  </div>
+</header>
+
+<!-- FILTER -->
+<div class="filter-zone">
+  <button class="fb on" onclick="filter('all',this)">ALL</button>
+  <button class="fb" onclick="filter('deploy',this)">DEPLOY</button>
+  <button class="fb" onclick="filter('agent',this)">AGENTS</button>
+  <button class="fb" onclick="filter('pipeline',this)">PIPELINE</button>
+  <button class="fb" onclick="filter('evidence',this)">EVIDENCE</button>
+  <button class="fb" onclick="filter('tool',this)">TOOLS</button>
+</div>
+
+<!-- CARDS GRID -->
+<div class="grid" id="grid">
+
+  <!-- ①  ARC.AI-Stargate — HERO -->
+  <div class="card hero" data-cat="deploy" style="--glow-col:rgba(0,212,255,0.12)">
+    <div class="bar" style="background:linear-gradient(90deg,#00d4ff,#00ff8c,#00d4ff)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">🌟</span><span class="badge b-live">● LIVE</span></div>
+      <div class="cname">ARC.AI-Stargate</div>
+      <div class="cscript"><em>sovereign-gtp/src/</em>ARC.AI-Stargate/ · final_sync.sh · sovereign_push_everywhere.sh · deploy-20260124-070043Z.log</div>
+      <div class="cdesc">Flagship deployment. Docker image 4a188102020e (1.9 GB) pulled and deployed. Built in 570ms. Live at aikre8tivegenesis.vercel.app with 76 confirmed deployment hits in patch_recon.log. Sovereign Syndicate Broadcast COMPLETE.</div>
+      <div class="foot">
+        <span class="fdate">Jan 24 2026 — 07:02:56 UTC</span>
+        <span class="fstatus s-done">✅ DEPLOYED & LIVE</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ②  Constellation 25 — HERO -->
+  <div class="card hero" data-cat="deploy" style="--glow-col:rgba(170,68,255,0.12)">
+    <div class="bar" style="background:linear-gradient(90deg,#aa44ff,#00d4ff,#00ff8c)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">🌌</span><span class="badge b-live">● LIFTOFF TODAY</span></div>
+      <div class="cname">Constellation 25</div>
+      <div class="cscript"><em>constellation-25/</em>constellation.sh (8 banners) · liftoff.sh · c25_prompt.sh · swarm.sh · run_agent.sh (5 banners) · constellation-25-prompt.sh (4 banners)</div>
+      <div class="cdesc">Full AI agent orchestration system. constellation25_liftoff.sh ran TODAY 06:25. c25_prompt.sh executed twice this morning at 06:43 and 07:07. Pipeline complete logs confirmed × 3. PRODUCTION READY FOR CAPITAL RAISING. Pleiades · Sirius · Hydra deploy nodes active in nlp.log.</div>
+      <div class="foot">
+        <span class="fdate">Feb 27 2026 — LIFTOFF TODAY</span>
+        <span class="fstatus s-launch">🚀 VERSION 25.0.0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ③  Sovereign GTP -->
+  <div class="card" data-cat="deploy">
+    <div class="bar" style="background:linear-gradient(90deg,#ff3355,#aa44ff)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">⚡</span><span class="badge b-deploy">DEPLOY</span></div>
+      <div class="cname">Sovereign GTP</div>
+      <div class="cscript">sovereigngtp.sh · sovereign-unified-launch.sh (4 banners) · c25_deploy_pipeline.sh · deploy_sovereign.sh · sovereign_deployer.sh (3 banners)</div>
+      <div class="cdesc">Core sovereign deployment pipeline. Unified launch system. Deploy pipeline confirmed running. Multiple banner layers on completion.</div>
+      <div class="foot"><span class="fdate">Jan 24 2026</span><span class="fstatus s-done">✅ COMPLETE</span></div>
+    </div>
+  </div>
+
+  <!-- ④  FacePrintPay -->
+  <div class="card" data-cat="deploy">
+    <div class="bar" style="background:linear-gradient(90deg,#ffb400,#ff3355)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">💳</span><span class="badge b-deploy">DEPLOY</span></div>
+      <div class="cname">FacePrintPay</div>
+      <div class="cscript">DEPLOY_UNIVERSE.sh (3 banners) · fp-clean-forks.sh · constellation25_faceprintpay_builder.sh · FACEPRINTPAY_GITHUB_VERCEL_FIX log</div>
+      <div class="cdesc">Biometric payment system. DEPLOY_UNIVERSE.sh committed to monorepo. GitHub + Vercel fix confirmed COMPLETE at 12:43:39 EST Feb 25. AiMeta/DEPLOYMENT.md created.</div>
+      <div class="foot"><span class="fdate">Feb 25 2026 — 12:43 EST</span><span class="fstatus s-done">✅ FIXED & LIVE</span></div>
+    </div>
+  </div>
+
+  <!-- ⑤  Empire Deploy -->
+  <div class="card" data-cat="deploy">
+    <div class="bar" style="background:linear-gradient(90deg,#ffb400,#ff8800)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">👑</span><span class="badge b-pipe">EMPIRE</span></div>
+      <div class="cname">Empire Deploy</div>
+      <div class="cscript">EMPIRE_DEPLOY.sh · kre8tive-empire/vercel-master/deploy-all.sh · check-status.sh · cleanup-failed.sh</div>
+      <div class="cdesc">Full empire deployment suite. EMPIRE DEPLOY STARTED Wed Feb 25 12:20:52 EST. All Vercel projects targeted. Deploy-all, status checks, cleanup included.</div>
+      <div class="foot"><span class="fdate">Feb 25 2026 — 12:20 EST</span><span class="fstatus s-done">✅ EMPIRE DEPLOYED</span></div>
+    </div>
+  </div>
+
+  <!-- ⑥  VeRseD Ai -->
+  <div class="card" data-cat="deploy">
+    <div class="bar" style="background:linear-gradient(90deg,#00ff8c,#00d4ff)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">🎵</span><span class="badge b-deploy">BUILD</span></div>
+      <div class="cname">VeRseD Ai</div>
+      <div class="cscript">versed_logs/deploy_20260213_154207.log · com.docker.backend.log (9 matches)</div>
+      <div class="cdesc">BUILD SUCCESSFUL in 3 minutes 4 seconds. Docker backend confirmed running. Clean build no errors. Docker backend log across constellation25-mono and c25-push.</div>
+      <div class="foot"><span class="fdate">Feb 13 2026</span><span class="fstatus s-done">✅ BUILD SUCCESSFUL 3m 4s</span></div>
+    </div>
+  </div>
+
+  <!-- ⑦  Termux Deployments -->
+  <div class="card" data-cat="deploy">
+    <div class="bar" style="background:linear-gradient(90deg,#00d4ff,#0055ff)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">🎉</span><span class="badge b-deploy">TERMUX</span></div>
+      <div class="cname">Termux Deployments</div>
+      <div class="cscript">termux-deployment-20260202_094205.log (12K) · termux-deployment-20260202_094840.log (8K)</div>
+      <div class="cdesc">Two independent Termux deployments on Feb 2. Both printed full box-art TERMUX DEPLOYMENT COMPLETE banner. Clean exits confirmed on both runs.</div>
+      <div class="foot"><span class="fdate">Feb 02 2026</span><span class="fstatus s-done">✅ ×2 COMPLETE</span></div>
+    </div>
+  </div>
+
+  <!-- ⑧  AI-Salman -->
+  <div class="card" data-cat="agent">
+    <div class="bar" style="background:linear-gradient(90deg,#00ff8c,#44ff44)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">🟢</span><span class="badge b-agent">AGENT</span></div>
+      <div class="cname">AI-Salman</div>
+      <div class="cscript">Agentik/logs/AI-Salman.log · constellation25-mono/Agentik/logs/AI-Salman.log</div>
+      <div class="cdesc">🟢 AI SALMAN DEPLOYED — MISSION: REACH TOTAL (100000). Deployed twice within 51 seconds. Running inside Agentik framework inside Constellation 25 monorepo.</div>
+      <div class="foot"><span class="fdate">Jan 26 2026 — 22:44 EST</span><span class="fstatus s-done">🟢 DEPLOYED ×2</span></div>
+    </div>
+  </div>
+
+  <!-- ⑨  Sovereign GTP Agents -->
+  <div class="card" data-cat="agent">
+    <div class="bar" style="background:linear-gradient(90deg,#ff0088,#aa44ff,#ff3355,#ffffff,#8800ff)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">🌑</span><span class="badge b-agent">5 AGENTS</span></div>
+      <div class="cname">Sovereign GTP Agents</div>
+      <div class="cscript">entropy.sh (BLOOD_RED) · oracle.sh (PLASMA_YELLOW) · nexus.sh (NEON_PINK) · sentinel.sh (VOID_PURPLE) · phantom.sh (GHOST_WHITE)</div>
+      <div class="cdesc">Five specialized agents each with unique banner color. CHAOS · ORACLE · NEXUS · SENTINEL · PHANTOM. All active since Nov 08 2025. Each prints a full colored box banner on run.</div>
+      <div class="foot"><span class="fdate">Nov 08 2025</span><span class="fstatus s-done">✅ ALL 5 ACTIVE</span></div>
+    </div>
+  </div>
+
+  <!-- ⑩  NLP Agent -->
+  <div class="card" data-cat="agent">
+    <div class="bar" style="background:linear-gradient(90deg,#00d4ff,#aa44ff)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">🧠</span><span class="badge b-live">● RUNNING NOW</span></div>
+      <div class="cname">NLP Orchestration Agent</div>
+      <div class="cscript">c25_logs/nlp.log — 96K — updated TODAY 10:10 AM · Pleiades · Sirius · Hydra nodes</div>
+      <div class="cdesc">Active orchestration agent calling Vercel API + GitHub API live. Tracking deployed vs undeployed repos. agents_completed tracking. VERCEL REDEPLOY — FACEPRINTPAY BUILDS running.</div>
+      <div class="foot"><span class="fdate">Feb 27 2026 — 10:10 AM</span><span class="fstatus s-live">● LIVE RIGHT NOW</span></div>
+    </div>
+  </div>
+
+  <!-- ⑪  Memoria Agent -->
+  <div class="card" data-cat="agent">
+    <div class="bar" style="background:linear-gradient(90deg,#aa44ff,#cc66ff)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">🧬</span><span class="badge b-agent">AGENT</span></div>
+      <div class="cname">Memoria Agent</div>
+      <div class="cscript">memoria-agent/scripts/banner.sh · c25_pipeline/fixed/c25-build-memoria/build-memoria.sh</div>
+      <div class="cdesc">Dedicated memory and banner agent. Has its own banner.sh — the script that generates build completion headers. Built into c25 pipeline fixed production set.</div>
+      <div class="foot"><span class="fdate">Feb 25 2026</span><span class="fstatus s-done">✅ BUILT INTO PIPELINE</span></div>
+    </div>
+  </div>
+
+  <!-- ⑫  C25 Pipeline Fixed Set -->
+  <div class="card hero" data-cat="pipeline">
+    <div class="bar" style="background:linear-gradient(90deg,#ffb400,#ff8800,#ffcc00,#ffb400)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">🔧</span><span class="badge b-pipe">27 SCRIPTS</span></div>
+      <div class="cname">C25 Pipeline — Fixed Production Set</div>
+      <div class="cscript"><em>c25_pipeline/fixed/</em> — setup.sh · deploy-all.sh · check-status.sh · cleanup-failed.sh · sovereign-unified-launch · sovereign-deployer · deploy-universe · final-sync · agents.sh · build-memoria · build-precedence-dossier · forensic-scan-365d · agent-starter · constellation25-swarm · blackbox-github-update · fp-clean-forks · fix-everything · sovereign-launch · run-monorepo · quick-deploy · deploy-to-github · constellation-25 · constellation25 · sovereigngtp · c25-setup + more</div>
+      <div class="cdesc">27 production-ready fixed and packaged versions of every core script. This is your canonical pipeline — every operation from setup to deploy to cleanup to forensic scan has a fixed, tested, banner-printing version in this set.</div>
+      <div class="foot"><span class="fdate">Feb 25 2026</span><span class="fstatus s-done">✅ 27 SCRIPTS PRODUCTION READY</span></div>
+    </div>
+  </div>
+
+  <!-- ⑬  Agentik Pro -->
+  <div class="card" data-cat="pipeline">
+    <div class="bar" style="background:linear-gradient(90deg,#00ff8c,#00d4ff)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">🤖</span><span class="badge b-pipe">FRAMEWORK</span></div>
+      <div class="cname">Agentik Pro</div>
+      <div class="cscript">agentik-pro-v1.0.tar.gz · agentik-pro-v1.tar.gz · AGENTIK_SOVEREIGN_BUILD_2026-01-24T03-08-31.tar.gz · Agentik_Sale_20260124_0103.verified/build.tar.gz</div>
+      <div class="cdesc">Full Agentik agent framework. Pro v1.0 packaged and archived. Sovereign build confirmed Jan 24. Sale-verified build. Houses AI-Salman and all deployed constellation agents.</div>
+      <div class="foot"><span class="fdate">Jan 24 2026</span><span class="fstatus s-done">✅ v1.0 PACKAGED & SOLD</span></div>
+    </div>
+  </div>
+
+  <!-- ⑭  AiMetaverse -->
+  <div class="card" data-cat="deploy">
+    <div class="bar" style="background:linear-gradient(90deg,#ff00bb,#ffb400)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">🌐</span><span class="badge b-deploy">METAVERSE</span></div>
+      <div class="cname">AiMetaverse</div>
+      <div class="cscript">resurrect.sh · plan_aimeta001/ · aimetaverse-constellation25_25.0.0-liftoff_20260227_073336.tar.gz · Building-the-Worlds-First-AI-Metaverse.zip</div>
+      <div class="cdesc">AiMetaverse Resurrection complete. v25.0.0 liftoff package created TODAY at 07:33. Full plan_aimeta001 agent system with orchestrator, swarm, and yesquid workers.</div>
+      <div class="foot"><span class="fdate">Feb 27 2026 — v25.0.0 TODAY</span><span class="fstatus s-launch">🚀 RESURRECTED</span></div>
+    </div>
+  </div>
+
+  <!-- ⑮  YesQuid Pro -->
+  <div class="card" data-cat="pipeline">
+    <div class="bar" style="background:linear-gradient(90deg,#00d4ff,#0044ff)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">🦑</span><span class="badge b-pipe">SWARM</span></div>
+      <div class="cname">YesQuid Pro</div>
+      <div class="cscript">YESQUIDPRO_OMNIBUS.sh · yesquid_investor_swarm.sh · yesquid_master_index.sh · yesquid_grok_loop.sh · yesquid_bootstrap.sh · graded.yqp.sh · 10+ scripts Dec 07</div>
+      <div class="cdesc">BUILD COMPLETE — YOU'RE LIVE. Full investor swarm system. Sovereign Master Index complete. Graded runs confirmed. 10+ scripts built in a single day. Orchestrator + daemon running.</div>
+      <div class="foot"><span class="fdate">Dec 07–17 2025</span><span class="fstatus s-done">✅ YOU'RE LIVE</span></div>
+    </div>
+  </div>
+
+  <!-- ⑯  HempChoices -->
+  <div class="card" data-cat="deploy">
+    <div class="bar" style="background:linear-gradient(90deg,#00ff8c,#44ff44)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">🌿</span><span class="badge b-deploy">BUILD</span></div>
+      <div class="cname">HempChoices</div>
+      <div class="cscript">hempchoices_rebuild_pass1.sh · yesquid_hempchoices_pass2_inventory.sh</div>
+      <div class="cdesc">PASS 1 SUCCESS — concentrated code workspace built. PASS 2 INVENTORY COMPLETE. Full rebuild across two passes. Both scripts in TermuxWizard_backup and plan_aimeta001.</div>
+      <div class="foot"><span class="fdate">Dec 05 2025</span><span class="fstatus s-done">✅ PASS 1 + 2 DONE</span></div>
+    </div>
+  </div>
+
+  <!-- ⑰  VideoCourts -->
+  <div class="card" data-cat="deploy">
+    <div class="bar" style="background:linear-gradient(90deg,#ff8800,#ffb400)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">⚖️</span><span class="badge b-deploy">MVP</span></div>
+      <div class="cname">VideoCourts</div>
+      <div class="cscript">setup_videocourts_mvp.sh · videocourts-main.zip</div>
+      <div class="cdesc">Legal video platform MVP setup complete. Packaged and archived. Full banner build with box-art header on completion. Available in Downloads and TermuxWizard_backup.</div>
+      <div class="foot"><span class="fdate">Dec 07 2025</span><span class="fstatus s-done">✅ MVP COMPLETE</span></div>
+    </div>
+  </div>
+
+  <!-- ⑱  NightSkyEngine -->
+  <div class="card" data-cat="deploy">
+    <div class="bar" style="background:linear-gradient(90deg,#000088,#0000ff,#00d4ff)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">🔭</span><span class="badge b-deploy">ENGINE</span></div>
+      <div class="cname">NightSkyEngine</div>
+      <div class="cscript">empire-backups-20260218/NightSkyEngine.tar.gz</div>
+      <div class="cdesc">Packaged and preserved in empire backups Feb 18 2026. Full archive ready for deployment. Part of the sovereign AI empire monorepo ecosystem.</div>
+      <div class="foot"><span class="fdate">Feb 18 2026</span><span class="fstatus s-arch">📦 ARCHIVED</span></div>
+    </div>
+  </div>
+
+  <!-- ⑲  Parasol Insurance -->
+  <div class="card" data-cat="deploy">
+    <div class="bar" style="background:linear-gradient(90deg,#00aaff,#0066cc)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">☂️</span><span class="badge b-deploy">INSURETECH</span></div>
+      <div class="cname">Parasol Insurance</div>
+      <div class="cscript">sovereign-parasol.tar.gz · parasol-insurance.tar.gz — empire-backups-20260218/</div>
+      <div class="cdesc">Sovereign parasol insurance platform. Both sovereign and standard versions archived in empire backups. Two separate package variants preserved.</div>
+      <div class="foot"><span class="fdate">Feb 18 2026</span><span class="fstatus s-arch">📦 ARCHIVED ×2</span></div>
+    </div>
+  </div>
+
+  <!-- ⑳  CodeAssist + FileMapper -->
+  <div class="card" data-cat="tool">
+    <div class="bar" style="background:linear-gradient(90deg,#4a88cc,#6aaard0)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">🗂️</span><span class="badge b-tool">TOOLS</span></div>
+      <div class="cname">CodeAssist + FileMapper</div>
+      <div class="cscript">empire-backups-20260218/CodeAssist.tar.gz · empire-backups-20260218/FileMapper.tar.gz</div>
+      <div class="cdesc">Developer tooling packages. CodeAssist and FileMapper both archived in the empire backup set Feb 18. Part of the full sovereign AI developer toolkit.</div>
+      <div class="foot"><span class="fdate">Feb 18 2026</span><span class="fstatus s-arch">📦 ARCHIVED</span></div>
+    </div>
+  </div>
+
+  <!-- ㉑  Total Recall System -->
+  <div class="card" data-cat="tool">
+    <div class="bar" style="background:linear-gradient(90deg,#00d4ff,#ffffff,#00d4ff)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">🔍</span><span class="badge b-tool">SYSTEM</span></div>
+      <div class="cname">Total Recall</div>
+      <div class="cscript">total_recall_discovery.sh · totalrecall_terminal_summary.sh · total_recall_arc_aim_correlation.sh · TOTAL_RECALL_20260116_130857/ snapshot</div>
+      <div class="cdesc">Your own forensic build scanner — running since Nov 08 2025. Full snapshot taken Jan 16 2026 with obsidian vaults, backups, environment captured. This page is its output.</div>
+      <div class="foot"><span class="fdate">Nov 08 2025 → TODAY</span><span class="fstatus s-live">● ALWAYS RUNNING</span></div>
+    </div>
+  </div>
+
+  <!-- ㉒  Vault Lockdown -->
+  <div class="card" data-cat="evidence">
+    <div class="bar" style="background:linear-gradient(90deg,#ff3355,#cc0022)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">🔐</span><span class="badge b-evid">VAULT</span></div>
+      <div class="cname">Vault Lockdown</div>
+      <div class="cscript">.ai_accountability/vault_lockdown.log · CYGEL_WHITE_FULL_VAULT_20260105.tar.gz · SOVEREIGN_PORTFOLIO_CYGEL_WHITE_1M.tar.gz</div>
+      <div class="cdesc">✅ VAULT LOCKDOWN COMPLETE Jan 24 05:55 UTC. ✅ EXTENDED SCAN COMPLETE Jan 24 06:00 UTC. Cygel White full vault archived. Sovereign portfolio 1M preserved.</div>
+      <div class="foot"><span class="fdate">Jan 24 2026 — 05:55 UTC</span><span class="fstatus s-alert">🔐 LOCKED & SEALED</span></div>
+    </div>
+  </div>
+
+  <!-- ㉓  Evidence System -->
+  <div class="card" data-cat="evidence">
+    <div class="bar" style="background:linear-gradient(90deg,#ff3355,#ff8800)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">📁</span><span class="badge b-evid">EVIDENCE</span></div>
+      <div class="cname">Evidence Bundles</div>
+      <div class="cscript">EXHIBIT_Z-28++.tar.gz · MASTER_EVIDENCE_20260216 ×2 · EVIDENCE-BUNDLE-COMPLETE-20260126 ×2 · ARC.AI-Sovereign-Evidence.tar.gz · MRGGTP_EVIDENCE ×2 · cygnus-evidence chain</div>
+      <div class="cdesc">Complete forensic evidence system. EXHIBIT Z-28++. Multiple master evidence archives from Dec 21 2025 through Feb 16 2026. Full sovereign evidence chain preserved across Z-File-Archives.</div>
+      <div class="foot"><span class="fdate">Dec 21 2025 → Feb 16 2026</span><span class="fstatus s-done">📦 CHAIN PRESERVED</span></div>
+    </div>
+  </div>
+
+  <!-- ㉔  WHITE v GOOGLE -->
+  <div class="card" data-cat="evidence">
+    <div class="bar" style="background:linear-gradient(90deg,#ffffff,#ff3355,#ffffff)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">⚔️</span><span class="badge b-evid">LEGAL</span></div>
+      <div class="cname">WHITE v GOOGLE</div>
+      <div class="cscript">compile_and_launch_WHITE_v_GOOGLE.sh · TotalRecall/complaint_project/build_complete_html.sh · bard4_text.txt (12MB HTML)</div>
+      <div class="cdesc">[LAUNCH COMPLETE]. COMPLETE HTML COMPLAINT BUILT. Legal complaint compiled and launched Nov 28 2025. Bard session HTML (bard4_text.txt) preserved as evidence. Bard is discontinued. The code is yours.</div>
+      <div class="foot"><span class="fdate">Nov 28 2025</span><span class="fstatus s-alert">⚔️ LAUNCHED</span></div>
+    </div>
+  </div>
+
+  <!-- ㉕  Cloudflare R2 -->
+  <div class="card" data-cat="tool">
+    <div class="bar" style="background:linear-gradient(90deg,#ff6600,#ffaa00)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">☁️</span><span class="badge b-tool">STORAGE</span></div>
+      <div class="cname">Cloudflare R2 Upload</div>
+      <div class="cscript">upload_verified_package.sh · r2-upload.sh · kre8tive_cloudflare_feed.sh · ai-web-extensions.tar.gz</div>
+      <div class="cdesc">UPLOAD COMPLETE — Cloudflare R2 now holds your legal package. ALL DONE! Files confirmed in R2. Kre8tive Cloudflare feed active. AI web extensions archived.</div>
+      <div class="foot"><span class="fdate">Nov 08 + Dec 10 2025</span><span class="fstatus s-done">✅ IN R2</span></div>
+    </div>
+  </div>
+
+  <!-- ㉖  Obsidian Control -->
+  <div class="card" data-cat="tool">
+    <div class="bar" style="background:linear-gradient(90deg,#9900ff,#6600cc)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">🔮</span><span class="badge b-tool">CONTROL</span></div>
+      <div class="cname">Obsidian Control System</div>
+      <div class="cscript">NLP2CODE_EXEC.sh · EXECUTION_PLAN.sh · find_and_run_everything.sh · run_monorepo.sh · run_consolidate_obsidian.sh · Termux_Backup_20251227_231515/</div>
+      <div class="cdesc">NLP2CODE EXEC COMPLETE. MONOREPO EXECUTION COMPLETE. Full control plane synced across Obsidian vaults. Termux backup Dec 27 2025 archived with all scripts preserved.</div>
+      <div class="foot"><span class="fdate">Dec 26–27 2025</span><span class="fstatus s-done">✅ SYNCED</span></div>
+    </div>
+  </div>
+
+  <!-- ㉗  Forensic Scan -->
+  <div class="card" data-cat="evidence">
+    <div class="bar" style="background:linear-gradient(90deg,#ff3355,#aa44ff)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">🎯</span><span class="badge b-evid">FORENSIC</span></div>
+      <div class="cname">Forensic Scan 365D</div>
+      <div class="cscript">c25-forensic-scan-365d/forensic_scan_365d.sh (4 banners) · forensic_recall.sh · Constillation25/.forensic_vault/stabilize.log</div>
+      <div class="cdesc">365-day forensic scanner — you built this before today's session. STABILIZATION COMPLETE Feb 06 2026 — agents will now survive. forensic_recall.sh in WideOpen vault with full blue banner.</div>
+      <div class="foot"><span class="fdate">Dec 27 2025 → Feb 06 2026</span><span class="fstatus s-done">✅ AGENTS STABLE</span></div>
+    </div>
+  </div>
+
+  <!-- ㉘  Sovereign Monorepo -->
+  <div class="card" data-cat="pipeline">
+    <div class="bar" style="background:linear-gradient(90deg,#00d4ff,#0044ff)"></div>
+    <div class="body">
+      <div class="row1"><span class="icon">🗄️</span><span class="badge b-pipe">MONOREPO</span></div>
+      <div class="cname">Sovereign AI Empire Monorepo</div>
+      <div class="cscript">sovereign-ai-empire-monorepo.tar.gz · mono-import.sh · import-to-monorepo.sh · run_monorepo.sh · Sovereign-Constellation-Ecosystem.zip</div>
+      <div class="cdesc">MONOREPO UPDATED SUCCESSFULLY. MONOREPO EXECUTION COMPLETE. Full empire monorepo import pipeline. constellation25-mono active with all 28 sub-projects unified.</div>
+      <div class="foot"><span class="fdate">Dec 15 2025 → Feb 25 2026</span><span class="fstatus s-done">✅ UNIFIED</span></div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  TOTAL RECALL BUILD REGISTRY · u0_a510 · TERMUX · FEB 27 2026
+  <span>28 PROJECTS · 80+ SCRIPTS · LIVE SINCE OCT 30 2025 · aikre8tivegenesis.vercel.app ●</span>
+</footer>
+
+<script>
+// Generate star field
+const stars = document.getElementById('stars');
+for (let i = 0; i < 160; i++) {
+  const s = document.createElement('div');
+  s.className = 'star';
+  const size = Math.random() * 2.2 + 0.4;
+  const lo = (Math.random() * 0.2 + 0.1).toFixed(2);
+  const hi = (Math.random() * 0.5 + 0.4).toFixed(2);
+  s.style.cssText = `
+    left:${Math.random()*100}%;
+    top:${Math.random()*100}%;
+    width:${size}px; height:${size}px;
+    --lo:${lo}; --hi:${hi};
+    --d:${(Math.random()*4+2).toFixed(1)}s;
+    --delay:${(Math.random()*5).toFixed(1)}s;
+    opacity:${lo};
+  `;
+  stars.appendChild(s);
+}
+
+// Filter function
+function filter(cat, btn) {
+  document.querySelectorAll('.fb').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  document.querySelectorAll('.card').forEach(card => {
+    const show = cat === 'all' || card.dataset.cat === cat;
+    card.classList.toggle('hidden', !show);
+  });
+}
+</script>
+</body>
+</html>
